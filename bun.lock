@@ -54,6 +54,10 @@
       },
     },
   },
+  "trustedDependencies": [
+    "@tailwindcss/oxide",
+    "spawn-sync",
+  ],
   "overrides": {
     "@crxjs/vite-plugin": "^2.0.0-beta.32",
   },
