@@ -1,4 +1,4 @@
-import { createApp, App as VueApp, ref } from 'vue';
+import { createApp, App as VueApp, computed, ref } from 'vue';
 import CommunityPopup from '../components/CommunityPopup.vue';
 import PersistentIconPopup from '../components/PersistentIconPopup.vue'; // Import the new component
 
@@ -12,6 +12,8 @@ interface CommunityItemRaw {
 interface CommunityItem { kodikos: string; description: string; }
 
 // --- State Variables ---
+const initializedCommunityInputs = new WeakSet<HTMLInputElement>(); // Track initialized inputs
+
 let communityVueApp: VueApp<Element> | null = null;
 let communityPopupVm: any = null;
 let communityPopupContainer: HTMLDivElement | null = null;
@@ -23,14 +25,16 @@ let persistentIconPopupVm: any = null;
 let persistentIconElement: HTMLElement | null = null;
 let persistentIconPopupContainer: HTMLDivElement | null = null;
 
-
-// --- Helper: Find Input Element by Label ---
-function findInputElementByLabelText(labelText: string): HTMLInputElement | null {
+// --- Helper: Find ALL Input Elements by Label ---
+function findAllCommunityInputFields(labelText: string): HTMLInputElement[] {
+    const inputs: HTMLInputElement[] = [];
     const labels = document.querySelectorAll<HTMLLabelElement>('label.q-field');
-    for (const label of labels) {
+    labels.forEach(label => {
         const pElement = label.querySelector<HTMLParagraphElement>('.q-field__label p.text-weight-bold.text-body1');
         if (pElement) {
+            // Clone to avoid modifying the live DOM element if we were to remove children
             const pClone = pElement.cloneNode(true) as HTMLParagraphElement;
+            // Attempt to remove the asterisk span more robustly
             const asteriskSpan = pClone.querySelector('span.text-weight-bolder.text-negative');
             if (asteriskSpan) {
                 asteriskSpan.remove();
@@ -39,12 +43,13 @@ function findInputElementByLabelText(labelText: string): HTMLInputElement | null
 
             if (actualLabelText.startsWith(labelText)) {
                 const inputElement = label.querySelector<HTMLInputElement>('input.q-field__native');
-                if (inputElement) return inputElement;
+                if (inputElement) {
+                    inputs.push(inputElement);
+                }
             }
         }
-    }
-    // console.warn(`Extension: Could not find input field associated with label "${labelText}"`);
-    return null;
+    });
+    return inputs;
 }
 
 // --- Helper: Apply Code to Page (for Community Helper) ---
@@ -57,22 +62,25 @@ async function applyCodeToPage(inputField: HTMLInputElement, code: string) {
     inputField.dispatchEvent(inputEvent);
     const changeEvent = new Event('change', { bubbles: true, cancelable: true });
     inputField.dispatchEvent(changeEvent);
-    inputField.blur();
+    inputField.blur(); // Important to trigger any on-blur logic the page might have
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 50)); // Short delay
     console.log(`Extension: Code '${code}' applied and events dispatched.`);
 }
 
 // --- API Fetching (for Community Helper) ---
+// Cache for fetched community data based on sLkpenId_id
+const communityDataCache = new Map<string, CommunityItem[]>();
+
 async function fetchCommunityData(sLkpenId_id: string): Promise<CommunityItem[]> {
+    if (communityDataCache.has(sLkpenId_id)) {
+        console.log("Extension: Using cached community data for sLkpenId_id:", sLkpenId_id);
+        return communityDataCache.get(sLkpenId_id)!;
+    }
     try {
         console.log("Extension: Fetching community data with sLkpenId_id:", sLkpenId_id);
-        // IMPORTANT: This ID (sLkpenId_id) might need to be dynamic based on another field's value.
-        // The example uses a static ID "XrAHzIAvvQP8XPX2h8NHRQ==".
-        // You may need to implement logic to retrieve this dynamically from the page
-        // if it changes based on user selections in preceding fields.
         const response = await fetch("https://eae2024.opekepe.gov.gr/eae2024/rest/LandKalkoinotite/findAllByCriteriaRange_LandKalkoinotiteGrpLandKalkoinotite", {
-            headers: {
+            headers: { 
                 "accept": "application/json, text/plain, */*",
                 "accept-language": "el-GR,el;q=0.7",
                 "cache-control": "no-cache",
@@ -84,20 +92,19 @@ async function fetchCommunityData(sLkpenId_id: string): Promise<CommunityItem[]>
                 "sec-fetch-dest": "empty",
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
-            },
-            referrer: "https://eae2024.opekepe.gov.gr/eae2024/",
-            referrerPolicy: "strict-origin-when-cross-origin",
+             },
             body: JSON.stringify({
                 "sLkpenId_id": sLkpenId_id,
-                "fromRowIndex": 0,
-                "toRowIndex": 2000,
-                "exc_Id": [],
-                "sortField": "description",
-                "sortOrder": true
+                "fromRowIndex":0,
+                "toRowIndex":2000,
+                "exc_Id":[],
+                "sortField":"description",
+                "sortOrder":true
             }),
             method: "POST",
             mode: "cors",
             credentials: "include"
+            // ... (method, mode, credentials as before) ...
         });
 
         if (!response.ok) {
@@ -105,103 +112,106 @@ async function fetchCommunityData(sLkpenId_id: string): Promise<CommunityItem[]>
         }
         const jsonData = await response.json();
         if (jsonData && jsonData.data) {
-            console.log("Extension: Community data fetched successfully", jsonData.data.length, "items");
-            return jsonData.data.map((item: CommunityItemRaw) => ({
+            const mappedData = jsonData.data.map((item: CommunityItemRaw) => ({
                 kodikos: item.kodikos,
                 description: item.description,
             }));
+            communityDataCache.set(sLkpenId_id, mappedData); // Cache the result
+            console.log("Extension: Community data fetched and cached", mappedData.length, "items for", sLkpenId_id);
+            return mappedData;
         }
         return [];
     } catch (error) {
-        console.error("Extension: Failed to fetch community data:", error);
+        console.error("Extension: Failed to fetch community data for", sLkpenId_id, error);
         return [];
     }
 }
 
-// --- Community Helper Specific Functions ---
-function setupCommunityPopupForInput(targetInput: HTMLInputElement, communityData: CommunityItem[]) {
-    if (communityPopupContainer && communityPopupContainer.parentElement) {
-        communityPopupContainer.remove(); // Clean up old one
-    }
-    communityPopupContainer = document.createElement('div');
-    communityPopupContainer.id = 'community-helper-popup-container';
+function setupCommunityPopupForSingleInput(targetInput: HTMLInputElement, communityData: CommunityItem[]) {
+    // ... (popup container creation logic) ...
 
-    const qFieldElement = targetInput.closest('.q-field');
-    if (qFieldElement) {
-        qFieldElement.style.position = 'relative'; // For absolute positioning of popup
-        qFieldElement.appendChild(communityPopupContainer); // Append inside q-field for better relative positioning
-        communityPopupContainer.style.position = 'absolute';
-        communityPopupContainer.style.left = '0';
-        communityPopupContainer.style.top = targetInput.offsetHeight + 'px'; // Position below the input part of q-field
-        communityPopupContainer.style.width = qFieldElement.offsetWidth + 'px';
-    } else {
-        targetInput.parentNode?.insertBefore(communityPopupContainer, targetInput.nextSibling);
-    }
+    const vueApp = createApp(CommunityPopup, { items: communityData, targetInput: targetInput });
+    const vm = vueApp.mount(localPopupContainer) as any; // Cast to any or a more specific type if you define one
 
-    communityVueApp = createApp(CommunityPopup, { items: communityData, targetInput: targetInput });
-    communityPopupVm = communityVueApp.mount(communityPopupContainer);
+    // ... (event listener for 'community-item-selected') ...
 
-    communityPopupContainer.addEventListener('community-item-selected', (event: Event) => {
-        const customEvent = event as CustomEvent<CommunityItem>;
-        if (customEvent.detail?.kodikos) {
-            applyCodeToPage(targetInput, customEvent.detail.kodikos).then(() => {
-                if (communityPopupVm?.hide) communityPopupVm.hide();
-            });
+    targetInput.addEventListener('input', () => {
+        if (vm?.setFilterText) {
+            vm.setFilterText(targetInput.value);
+            // Access .value of the exposed ComputedRef and then its length
+            if (targetInput.value.length > 0 && vm.show && vm.currentFilteredItems?.value?.length > 0) {
+                vm.show();
+            } else if (vm.hide) {
+                vm.hide();
+            }
         }
     });
-}
 
-function handleCommunityInputInteraction(inputElement: HTMLInputElement) {
-    currentCommunityTargetInput = inputElement;
-    inputElement.addEventListener('input', () => {
-        if (communityPopupVm?.setFilterText) {
-            communityPopupVm.setFilterText(inputElement.value);
-            if (inputElement.value.length > 0 && communityPopupVm.show) communityPopupVm.show();
-            else if (inputElement.value.length === 0 && communityPopupVm.hide) communityPopupVm.hide();
+    targetInput.addEventListener('focus', () => {
+        if (vm?.setFilterText) vm.setFilterText(targetInput.value);
+        // Access .value of the exposed ComputedRef and then its length
+        if (vm?.show && vm.currentFilteredItems?.value?.length > 0) {
+            vm.show();
         }
     });
-    inputElement.addEventListener('focus', () => {
-        if (communityPopupVm?.setFilterText) communityPopupVm.setFilterText(inputElement.value);
-        if (communityPopupVm?.show) communityPopupVm.show();
-    });
-    inputElement.addEventListener('keydown', (event: KeyboardEvent) => {
-        if (!communityPopupVm) return;
-        const actions = {
-            'ArrowDown': () => { event.preventDefault(); communityPopupVm.show?.(); communityPopupVm.navigate?.('down'); },
-            'ArrowUp': () => { event.preventDefault(); communityPopupVm.show?.(); communityPopupVm.navigate?.('up'); },
-            'Enter': () => { event.preventDefault(); communityPopupVm.confirmSelection?.(); },
-            'Tab': () => { if(communityPopupVm.isVisible) {event.preventDefault(); communityPopupVm.confirmSelection?.();} }, // Only prevent tab if popup is active
-            'Escape': () => communityPopupVm.hide?.()
+
+    targetInput.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (!vm) return;
+        // Use the exposed reactive properties
+        const isPopupVisible = vm.isPopupVisible?.value;
+        const currentHasSelection = vm.hasSelection?.value;
+
+        const actions: Record<string, () => void> = {
+            'ArrowDown': () => { event.preventDefault(); vm.show?.(); vm.navigate?.('down'); },
+            'ArrowUp': () => { event.preventDefault(); vm.show?.(); vm.navigate?.('up'); },
+            'Enter': () => { if (isPopupVisible && currentHasSelection) { event.preventDefault(); vm.confirmSelection?.(); } },
+            'Tab': () => {
+                // Only interfere with Tab if the popup is visible and has a potential selection
+                if (isPopupVisible && currentHasSelection) {
+                    event.preventDefault();
+                    vm.confirmSelection?.();
+                } else if (isPopupVisible) {
+                    // If popup is visible but no selection, just hide it and let tab do its default
+                    vm.hide?.();
+                }
+            },
+            'Escape': () => { if (isPopupVisible) vm.hide?.(); }
         };
         actions[event.key]?.();
     });
+    console.log(`Extension: Community Helper setup for input:`, targetInput);
 }
 
-async function initializeCommunityHelper() {
-    if (communityHelperInitialized || !window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
+
+async function scanAndInitializeCommunityHelpers() {
+    if (!window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
         return;
     }
-    console.log("Extension: Attempting to initialize Community Helper.");
+    // console.log("Extension: Scanning for Community Helper targets.");
 
     const targetLabelText = 'Δημοτική-Τοπική Κοινότητα';
-    const targetInput = findInputElementByLabelText(targetLabelText);
+    const targetInputs = findAllCommunityInputFields(targetLabelText);
 
-    if (targetInput) {
-        console.log("Extension: Target input for Community Helper found:", targetInput);
-        // Static ID for now, see comment in fetchCommunityData for making it dynamic
+    if (targetInputs.length > 0) {
+        // TODO: Determine sLkpenId_id dynamically if it varies per input.
+        // For now, using a static one. If dynamic, this fetch might need to be inside the loop
+        // or data fetched per unique sLkpenId_id.
         const sLkpenId_id_for_fetch = "XrAHzIAvvQP8XPX2h8NHRQ==";
         const communityData = await fetchCommunityData(sLkpenId_id_for_fetch);
 
-        if (communityData.length > 0) {
-            setupCommunityPopupForInput(targetInput, communityData);
-            handleCommunityInputInteraction(targetInput);
-            communityHelperInitialized = true; // Mark as initialized
-            console.log("Extension: Community Helper initialized.");
-        } else {
-            console.log("Extension: No community data for Community Helper.");
+        if (communityData.length === 0 && sLkpenId_id_for_fetch) { // Only warn if we expected data
+            console.log("Extension: No community data fetched, cannot initialize helpers for sLkpenId:", sLkpenId_id_for_fetch);
+            return;
         }
-    } else {
-        // console.log("Extension: Target input for Community Helper not found on this check.");
+
+        for (const input of targetInputs) {
+            if (!initializedCommunityInputs.has(input)) {
+                if (communityData.length > 0) { // Only setup if we have data for this ID
+                    setupCommunityPopupForSingleInput(input, communityData);
+                }
+                initializedCommunityInputs.add(input);
+            }
+        }
     }
 }
 
@@ -212,7 +222,6 @@ function createPersistentIcon() {
     persistentIconElement = document.createElement('div'); // Use div for easier styling if SVG is complex
     persistentIconElement.id = 'my-extension-persistent-icon';
 
-    // Basic styling, can be improved with an actual SVG icon
     persistentIconElement.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
@@ -232,23 +241,13 @@ function createPersistentIcon() {
     iconStyle.cursor = 'pointer';
     iconStyle.zIndex = '2147483646';
     iconStyle.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-    // try { // In case browser.runtime.getURL is not available in all contexts as expected
-    //   persistentIconElement.src = browser.runtime.getURL('src/assets/persistent-icon.svg');
-    // } catch (e) {
-    //   console.warn("Extension: Could not load icon from assets. Using placeholder.", e);
-    //   persistentIconElement.textContent = "💡"; // Placeholder if SVG fails
-    //   iconStyle.padding = "10px";
-    //   iconStyle.fontSize = "24px";
-    // }
-
 
     persistentIconElement.addEventListener('click', togglePersistentIconPopup);
     document.body.appendChild(persistentIconElement);
 
-    // Create container for the persistent icon's Vue popup (initially hidden)
     persistentIconPopupContainer = document.createElement('div');
     persistentIconPopupContainer.id = 'persistent-icon-popup-root';
-    document.body.appendChild(persistentIconPopupContainer); // Appended to body, Vue component will control visibility and position
+    document.body.appendChild(persistentIconPopupContainer);
 
     persistentIconVueApp = createApp(PersistentIconPopup, {});
     persistentIconPopupVm = persistentIconVueApp.mount(persistentIconPopupContainer);
@@ -261,21 +260,41 @@ function togglePersistentIconPopup() {
 }
 
 // --- Main Initialization and Observation ---
+let debounceScanTimer: number | undefined;
+function debouncedScanAndInitialize() {
+    clearTimeout(debounceScanTimer);
+    debounceScanTimer = window.setTimeout(scanAndInitializeCommunityHelpers, 500); // Debounce
+}
+
 function main() {
     if (!window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
         return;
     }
-
-    // Create the persistent icon as soon as the content script runs on a matching page
+    console.log("Extension: Content script main() called.");
     createPersistentIcon();
+    debouncedScanAndInitialize(); // Initial scan
 
-    // Attempt to initialize the community helper immediately
-    initializeCommunityHelper();
+    const observer = new MutationObserver((mutationsList) => {
+        let potentiallyRelevantChange = false;
+        for (const mutation of mutationsList) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                for (const node of Array.from(mutation.addedNodes)) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const element = node as HTMLElement;
+                        // Check if the added node itself or its descendants match our target criteria
+                        if (element.matches?.('label.q-field, .q-field') || element.querySelector('label.q-field, input.q-field__native')) {
+                            potentiallyRelevantChange = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (potentiallyRelevantChange) break;
+        }
 
-    // Observe for dynamic changes in case the community input field loads later
-    const observer = new MutationObserver(() => {
-        if (!communityHelperInitialized) { // Only try to initialize if not already done
-            initializeCommunityHelper();
+        if (potentiallyRelevantChange) {
+            // console.log("Extension: Potentially relevant DOM change detected, rescanning.");
+            debouncedScanAndInitialize();
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
