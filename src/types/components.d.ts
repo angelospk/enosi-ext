@@ -10,8 +10,10 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppFooter: typeof import('./../components/AppFooter.vue')['default']
     AppHeader: typeof import('./../components/AppHeader.vue')['default']
+    CommunityPopup: typeof import('./../components/CommunityPopup.vue')['default']
     DisplayError: typeof import('./../components/state/DisplayError.vue')['default']
     LoadingSpinner: typeof import('./../components/state/LoadingSpinner.vue')['default']
+    PersistentIconPopup: typeof import('./../components/PersistentIconPopup.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterLinkUp: typeof import('./../components/RouterLinkUp.vue')['default']
     RouterView: typeof import('vue-router')['RouterView']
