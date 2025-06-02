@@ -1,6 +1,7 @@
 import { createApp, App as VueApp, ref } from 'vue';
 import CommunityPopup from '../components/CommunityPopup.vue';
 import PersistentIconPopup from '../components/PersistentIconPopup.vue'; // Import the new component
+import { createPinia } from 'pinia';
 
 // --- Interfaces ---
 interface CommunityItemRaw {
@@ -248,9 +249,12 @@ function createPersistentIcon() {
     // Create container for the persistent icon's Vue popup (initially hidden)
     persistentIconPopupContainer = document.createElement('div');
     persistentIconPopupContainer.id = 'persistent-icon-popup-root';
-    document.body.appendChild(persistentIconPopupContainer); // Appended to body, Vue component will control visibility and position
+    document.body.appendChild(persistentIconPopupContainer);
+
+    const piniaInstance = createPinia(); // Create a Pinia instance for this app
 
     persistentIconVueApp = createApp(PersistentIconPopup, {});
+    persistentIconVueApp.use(piniaInstance); // Use Pinia for this Vue app
     persistentIconPopupVm = persistentIconVueApp.mount(persistentIconPopupContainer);
 }
 

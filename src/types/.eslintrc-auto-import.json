@@ -276,6 +276,7 @@
     "useParentElement": true,
     "usePerformanceObserver": true,
     "usePermission": true,
+    "usePersistentPopupStore": true,
     "usePointer": true,
     "usePointerLock": true,
     "usePointerSwipe": true,
