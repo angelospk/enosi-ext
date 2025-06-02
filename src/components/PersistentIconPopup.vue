@@ -2,6 +2,7 @@
     <div v-if="isVisible" class="persistent-icon-popup-content">
       <h4>Extension Popup</h4>
       <p>Content for this popup will be added later.</p>
+      <p>Current time: {{ new Date().toLocaleTimeString() }}</p>
       <button @click="closePopup">Close</button>
     </div>
   </template>
