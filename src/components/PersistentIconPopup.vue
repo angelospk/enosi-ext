@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="isVisible"
+    ref="popupEl"
     class="persistent-icon-popup-content"
     :style="{
       top: state.y + 'px',
@@ -8,36 +9,47 @@
       width: state.width + 'px',
       height: state.height + 'px',
     }"
-    ref="popupEl"
   >
     <div
       class="popup-header"
       @mousedown.prevent="handleDragStart"
     >
-      <h4>Extension Popup</h4>
-      <button class="close-button" @click.stop="closePopup" title="Close">×</button>
+      <h4>Μηνύματα Αίτησης</h4>
+      <button
+        class="close-button"
+        title="Close"
+        @click.stop="closePopupAndClearBadge"
+      >
+        ×
+      </button>
     </div>
 
     <div class="popup-body">
-      <p>Content for this popup will be added later.</p>
-      <p style="font-size: 0.8em; opacity: 0.7;">
-        Pos: X: {{ Math.round(state.x) }}, Y: {{ Math.round(state.y) }}<br/>
-        Size: W: {{ Math.round(state.width) }}, H: {{ Math.round(state.height) }}
-      </p>
+      <MessagesDisplay /> 
     </div>
 
-    <!-- Resize Handles -->
-    <div class="resize-handle resize-handle-br" @mousedown.prevent="handleResizeStart($event, 'br')"></div>
-    <div class="resize-handle resize-handle-r" @mousedown.prevent="handleResizeStart($event, 'r')"></div>
-    <div class="resize-handle resize-handle-b" @mousedown.prevent="handleResizeStart($event, 'b')"></div>
-    
-    <!-- Add more handles (t, l, tl, tr, bl) if needed, adjusting logic in handleResizing -->
+
+    <div
+      class="resize-handle resize-handle-br"
+      @mousedown.prevent="handleResizeStart($event, 'br')"
+    ></div>
+    <div
+      class="resize-handle resize-handle-r"
+      @mousedown.prevent="handleResizeStart($event, 'r')"
+    ></div>
+    <div
+      class="resize-handle resize-handle-b"
+      @mousedown.prevent="handleResizeStart($event, 'b')"
+    ></div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
-import { useBrowserLocalStorage } from '../composables/useBrowserStorage'; // Adjust path if necessary
+import { useBrowserLocalStorage } from '../composables/useBrowserStorage';
+import MessagesDisplay from './MessagesDisplay.vue'; // Εισαγωγή του νέου component
+import { useMessageStore } from '../stores/messages.store'; // Για τον καθαρισμό του badge
+import { sendMessage } from 'webext-bridge/content-script';
 
 interface PopupState {
   x: number;
@@ -48,43 +60,38 @@ interface PopupState {
 
 const isVisible = ref(false);
 const popupEl = ref<HTMLElement | null>(null);
+const localMessageStore = useMessageStore(); // Χρήση του τοπικού store που συγχρονίζεται από το background
 
 // --- State for Dragging and Resizing ---
+// ... (η υπόλοιπη λογική για drag/resize παραμένει ως έχει)
 const operation = ref<'idle' | 'dragging' | 'resizing'>('idle');
-const dragStartPos = ref({ x: 0, y: 0 }); // For both drag and resize start mouse pos
-const initialPopupState = ref<PopupState | null>(null); // For state at drag/resize start
+const dragStartPos = ref({ x: 0, y: 0 });
+const initialPopupState = ref<PopupState | null>(null);
 const activeResizeHandle = ref<string | null>(null);
 
-// Default state, will be overridden by stored state
 const defaultState: PopupState = {
-  x: window.innerWidth - 320, // Adjusted for default width
-  y: window.innerHeight - 300, // Adjusted for default height
-  width: 300,
-  height: 200,
+  x: window.innerWidth - 380, // Default X
+  y: 60,                      // Default Y (πιο κοντά στην κορυφή)
+  width: 360,                 // Default Width
+  height: 450,                // Default Height
 };
+const minWidth = 250;
+const minHeight = 200;
 
-// Min dimensions
-const minWidth = 150;
-const minHeight = 100;
-
-// Use browser storage for the entire state (position and size)
 const { data: state, promise: statePromise } = useBrowserLocalStorage<PopupState>(
-  'persistentPopupState', // Single key for combined state
+  'persistentPopupState',
   { ...defaultState }
 );
 
 onMounted(async () => {
-  await statePromise.value; // Wait for storage to load
-  // Validate and reset if necessary
+  await statePromise;
   if (state.value.width < minWidth) state.value.width = defaultState.width;
   if (state.value.height < minHeight) state.value.height = defaultState.height;
   ensureInViewport();
 });
 
 const ensureInViewport = () => {
-  if (!popupEl.value && !isVisible.value) return; // Don't run if not visible or no element yet
-
-    // Use current state values for x, y, width, height
+  // ... (παραμένει ως έχει)
     let newX = state.value.x;
     let newY = state.value.y;
     const currentWidth = state.value.width;
@@ -114,14 +121,23 @@ const hide = () => {
   isVisible.value = false;
 };
 
+const closePopupAndClearBadge = () => {
+    hide();
+    sendMessage('clear-change-counters', null).catch(e => console.warn("CS: Failed to send clear-change-counters", e));
+    sendMessage('popup-visibility-changed', { visible: false }).catch(e => console.warn("CS: Failed to send popup-visibility-changed", e));
+}
+
 const toggleVisibility = () => {
-  if (isVisible.value) hide();
-  else show();
+  if (isVisible.value) {
+    closePopupAndClearBadge();
+  } else {
+    show();
+    sendMessage('clear-change-counters', null).catch(e => console.warn("CS: Failed to send clear-change-counters", e));
+    sendMessage('popup-visibility-changed', { visible: true }).catch(e => console.warn("CS: Failed to send popup-visibility-changed", e));
+  }
 };
-
-const closePopup = () => hide();
-
 // --- Drag (Move) Logic ---
+// ... (παραμένει ως έχει)
 const handleDragStart = (event: MouseEvent) => {
   if (operation.value !== 'idle') return;
   operation.value = 'dragging';
@@ -134,6 +150,7 @@ const handleDragStart = (event: MouseEvent) => {
 };
 
 // --- Resize Logic ---
+// ... (παραμένει ως έχει)
 const handleResizeStart = (event: MouseEvent, handle: string) => {
   if (operation.value !== 'idle') return;
   operation.value = 'resizing';
@@ -147,6 +164,7 @@ const handleResizeStart = (event: MouseEvent, handle: string) => {
 };
 
 // --- Unified Mouse Move for Drag & Resize ---
+// ... (παραμένει ως έχει)
 const handleMouseMove = (event: MouseEvent) => {
   if (operation.value === 'idle' || !initialPopupState.value) return;
   event.preventDefault();
@@ -158,7 +176,6 @@ const handleMouseMove = (event: MouseEvent) => {
     let newX = initialPopupState.value.x + dx;
     let newY = initialPopupState.value.y + dy;
 
-    // Constrain position to viewport
     newX = Math.max(0, Math.min(newX, window.innerWidth - state.value.width));
     newY = Math.max(0, Math.min(newY, window.innerHeight - state.value.height));
     state.value.x = newX;
@@ -174,22 +191,13 @@ const handleMouseMove = (event: MouseEvent) => {
     if (activeResizeHandle.value.includes('b')) {
       newHeight = Math.max(minHeight, initialPopupState.value.height + dy);
     }
-    // Add conditions for 'l' and 't' if you implement those handles
-    // e.g., if (activeResizeHandle.value.includes('l')) {
-    //   const newTentativeWidth = initialPopupState.value.width - dx;
-    //   if (newTentativeWidth >= minWidth) {
-    //     state.value.x = initialPopupState.value.x + dx;
-    //     newWidth = newTentativeWidth;
-    //   }
-    // }
-
-    // Ensure popup does not go off-screen during resize
     state.value.width = Math.min(newWidth, window.innerWidth - state.value.x);
     state.value.height = Math.min(newHeight, window.innerHeight - state.value.y);
   }
 };
 
 // --- Unified Mouse Up for Drag & Resize ---
+// ... (παραμένει ως έχει)
 const handleMouseUp = () => {
   if (operation.value === 'idle') return;
   operation.value = 'idle';
@@ -199,10 +207,11 @@ const handleMouseUp = () => {
   document.removeEventListener('mousemove', handleMouseMove);
   document.removeEventListener('mouseup', handleMouseUp);
   document.body.style.userSelect = '';
-  // State is already updated and useBrowserLocalStorage will auto-save
 };
 
+
 onUnmounted(() => {
+  // ... (παραμένει ως έχει)
   document.removeEventListener('mousemove', handleMouseMove);
   document.removeEventListener('mouseup', handleMouseUp);
   if (document.body.style.userSelect === 'none') {
@@ -210,10 +219,11 @@ onUnmounted(() => {
   }
 });
 
-defineExpose({ show, hide, toggleVisibility });
+defineExpose({ show, hide, toggleVisibility, isVisible }); // Expose isVisible
 </script>
 
 <style scoped>
+/* ... (οι υπάρχουσες κλάσεις CSS παραμένουν, προσέξτε το popup-body) ... */
 .persistent-icon-popup-content {
   position: fixed;
   background-color: white;
@@ -224,8 +234,7 @@ defineExpose({ show, hide, toggleVisibility });
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Important if handles are pseudo-elements or partially outside */
-  /* min-width and min-height are enforced in JS now */
+  overflow: hidden;
 }
 
 .popup-header {
@@ -236,8 +245,9 @@ defineExpose({ show, hide, toggleVisibility });
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 36px; /* Fixed header height */
+  height: 36px;
   box-sizing: border-box;
+  flex-shrink: 0; /* Header won't shrink */
 }
 
 .popup-header h4 {
@@ -265,15 +275,12 @@ defineExpose({ show, hide, toggleVisibility });
 }
 
 .popup-body {
-  padding: 15px;
+  /* padding: 15px;  -> Το padding θα το διαχειρίζεται το MessagesDisplay.vue */
   color: #555;
   flex-grow: 1;
-  overflow-y: auto; /* Allow body to scroll if content exceeds new height */
+  overflow-y: auto; /* Επιτρέπει scroll στο σώμα του popup */
   font-size: 14px;
-}
-.popup-body p {
-  margin-top: 0;
-  margin-bottom: 10px;
+  min-height: 0; /* Για σωστή λειτουργία του flex-grow με overflow */
 }
 
 .resize-handle {

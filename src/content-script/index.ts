@@ -1,18 +1,33 @@
-import { createApp, App as VueApp, ref } from 'vue';
+import { createApp, App as VueApp, ref, watch as vueWatch, nextTick } from 'vue';
 import CommunityPopup from '../components/CommunityPopup.vue';
-import PersistentIconPopup from '../components/PersistentIconPopup.vue'; // Import the new component
-import { createPinia } from 'pinia';
+import PersistentIconPopup from '../components/PersistentIconPopup.vue';
+import ErrorNotification from '../components/ErrorNotification.vue';
+import { createPinia, Pinia, Store } from 'pinia'; // Θα χρησιμοποιήσουμε ένα "dummy" store στο content-script
+                                                // για να κρατάμε την κατάσταση που έρχεται από το background.
+import { type BackgroundState } from '../types/bridge'; // Ελέγξτε τη διαδρομή
+import { useMessageStore } from '../stores/messages.store'; // Για τον τύπο και τοπική χρήση
+import { sendMessage, onMessage } from 'webext-bridge/content-script';
+import browser from 'webextension-polyfill';
 
-// --- Interfaces ---
-interface CommunityItemRaw {
-  id: string;
-  kodikos: string;
-  description: string;
-  lkpenId?: { id: string; kodikos: string; description: string; };
-}
-interface CommunityItem { kodikos: string; description: string; }
 
-// --- State Variables ---
+console.log("Extension: Content script loaded.");
+
+// --- State Variables (Τοπική Κατάσταση Αντίγραφο του Store) ---
+const localBackgroundState = ref<BackgroundState>({
+  currentApplicationId: null,
+  messages: [],
+  isLoading: true,
+  lastError: null,
+  changeCounters: { newErrors: 0, newWarnings: 0, newInfos: 0, removedMessages: 0 },
+});
+
+// Pinia instance για τα Vue components στο content script.
+// Δεν θα συγχρονίζεται αυτόματα με το background, αλλά θα το ενημερώνουμε μέσω webext-bridge.
+const piniaInstanceForContentScript: Pinia = createPinia();
+let localMessageStore: ReturnType<typeof useMessageStore>; // Τοπικό store για τα components
+
+
+// Vue app instances (παραμένουν)
 let communityVueApp: VueApp<Element> | null = null;
 let communityPopupVm: any = null;
 let communityPopupContainer: HTMLDivElement | null = null;
@@ -24,269 +39,213 @@ let persistentIconPopupVm: any = null;
 let persistentIconElement: HTMLElement | null = null;
 let persistentIconPopupContainer: HTMLDivElement | null = null;
 
+let errorNotificationVueApp: VueApp<Element> | null = null;
+let errorNotificationVm: any = null;
+let errorNotificationContainer: HTMLDivElement | null = null;
 
-// --- Helper: Find Input Element by Label ---
-function findInputElementByLabelText(labelText: string): HTMLInputElement | null {
-    const labels = document.querySelectorAll<HTMLLabelElement>('label.q-field');
-    for (const label of labels) {
-        const pElement = label.querySelector<HTMLParagraphElement>('.q-field__label p.text-weight-bold.text-body1');
-        if (pElement) {
-            const pClone = pElement.cloneNode(true) as HTMLParagraphElement;
-            const asteriskSpan = pClone.querySelector('span.text-weight-bolder.text-negative');
-            if (asteriskSpan) {
-                asteriskSpan.remove();
-            }
-            const actualLabelText = pClone.textContent?.trim() || "";
 
-            if (actualLabelText.startsWith(labelText)) {
-                const inputElement = label.querySelector<HTMLInputElement>('input.q-field__native');
-                if (inputElement) return inputElement;
-            }
-        }
-    }
-    // console.warn(`Extension: Could not find input field associated with label "${labelText}"`);
-    return null;
-}
 
-// --- Helper: Apply Code to Page (for Community Helper) ---
-async function applyCodeToPage(inputField: HTMLInputElement, code: string) {
-    console.log(`Extension: Applying code '${code}' to input field:`, inputField);
-    inputField.focus();
-    inputField.value = code;
 
-    const inputEvent = new Event('input', { bubbles: true, cancelable: true });
-    inputField.dispatchEvent(inputEvent);
-    const changeEvent = new Event('change', { bubbles: true, cancelable: true });
-    inputField.dispatchEvent(changeEvent);
-    inputField.blur();
+// --- Icon Badge & Error Notification ---
+let iconBadgeElement: HTMLSpanElement | null = null;
 
-    await new Promise(resolve => setTimeout(resolve, 50));
-    console.log(`Extension: Code '${code}' applied and events dispatched.`);
-}
+// --- Persistent Icon & UI (Παραμένει η λογική UI) ---
+function setupPersistentIconAndBadge() {
+    if (document.getElementById('my-extension-persistent-icon')) return;
 
-// --- API Fetching (for Community Helper) ---
-async function fetchCommunityData(sLkpenId_id: string): Promise<CommunityItem[]> {
-    try {
-        console.log("Extension: Fetching community data with sLkpenId_id:", sLkpenId_id);
-        // IMPORTANT: This ID (sLkpenId_id) might need to be dynamic based on another field's value.
-        // The example uses a static ID "XrAHzIAvvQP8XPX2h8NHRQ==".
-        // You may need to implement logic to retrieve this dynamically from the page
-        // if it changes based on user selections in preceding fields.
-        const response = await fetch("https://eae2024.opekepe.gov.gr/eae2024/rest/LandKalkoinotite/findAllByCriteriaRange_LandKalkoinotiteGrpLandKalkoinotite", {
-            headers: {
-                "accept": "application/json, text/plain, */*",
-                "accept-language": "el-GR,el;q=0.7",
-                "cache-control": "no-cache",
-                "content-type": "application/json",
-                "pragma": "no-cache",
-                "sec-ch-ua": "\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": "\"Windows\"",
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-origin",
-            },
-            referrer: "https://eae2024.opekepe.gov.gr/eae2024/",
-            referrerPolicy: "strict-origin-when-cross-origin",
-            body: JSON.stringify({
-                "sLkpenId_id": sLkpenId_id,
-                "fromRowIndex": 0,
-                "toRowIndex": 2000,
-                "exc_Id": [],
-                "sortField": "description",
-                "sortOrder": true
-            }),
-            method: "POST",
-            mode: "cors",
-            credentials: "include"
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}, message: ${await response.text()}`);
-        }
-        const jsonData = await response.json();
-        if (jsonData && jsonData.data) {
-            console.log("Extension: Community data fetched successfully", jsonData.data.length, "items");
-            return jsonData.data.map((item: CommunityItemRaw) => ({
-                kodikos: item.kodikos,
-                description: item.description,
-            }));
-        }
-        return [];
-    } catch (error) {
-        console.error("Extension: Failed to fetch community data:", error);
-        return [];
-    }
-}
-
-// --- Community Helper Specific Functions ---
-function setupCommunityPopupForInput(targetInput: HTMLInputElement, communityData: CommunityItem[]) {
-    if (communityPopupContainer && communityPopupContainer.parentElement) {
-        communityPopupContainer.remove(); // Clean up old one
-    }
-    communityPopupContainer = document.createElement('div');
-    communityPopupContainer.id = 'community-helper-popup-container';
-
-    const qFieldElement = targetInput.closest('.q-field');
-    if (qFieldElement) {
-        qFieldElement.style.position = 'relative'; // For absolute positioning of popup
-        qFieldElement.appendChild(communityPopupContainer); // Append inside q-field for better relative positioning
-        communityPopupContainer.style.position = 'absolute';
-        communityPopupContainer.style.left = '0';
-        communityPopupContainer.style.top = targetInput.offsetHeight + 'px'; // Position below the input part of q-field
-        communityPopupContainer.style.width = qFieldElement.offsetWidth + 'px';
-    } else {
-        targetInput.parentNode?.insertBefore(communityPopupContainer, targetInput.nextSibling);
-    }
-
-    communityVueApp = createApp(CommunityPopup, { items: communityData, targetInput: targetInput });
-    communityPopupVm = communityVueApp.mount(communityPopupContainer);
-
-    communityPopupContainer.addEventListener('community-item-selected', (event: Event) => {
-        const customEvent = event as CustomEvent<CommunityItem>;
-        if (customEvent.detail?.kodikos) {
-            applyCodeToPage(targetInput, customEvent.detail.kodikos).then(() => {
-                if (communityPopupVm?.hide) communityPopupVm.hide();
-            });
-        }
-    });
-}
-
-function handleCommunityInputInteraction(inputElement: HTMLInputElement) {
-    currentCommunityTargetInput = inputElement;
-    inputElement.addEventListener('input', () => {
-        if (communityPopupVm?.setFilterText) {
-            communityPopupVm.setFilterText(inputElement.value);
-            if (inputElement.value.length > 0 && communityPopupVm.show) communityPopupVm.show();
-            else if (inputElement.value.length === 0 && communityPopupVm.hide) communityPopupVm.hide();
-        }
-    });
-    inputElement.addEventListener('focus', () => {
-        if (communityPopupVm?.setFilterText) communityPopupVm.setFilterText(inputElement.value);
-        if (communityPopupVm?.show) communityPopupVm.show();
-    });
-    inputElement.addEventListener('keydown', (event: KeyboardEvent) => {
-        if (!communityPopupVm) return;
-        const actions = {
-            'ArrowDown': () => { event.preventDefault(); communityPopupVm.show?.(); communityPopupVm.navigate?.('down'); },
-            'ArrowUp': () => { event.preventDefault(); communityPopupVm.show?.(); communityPopupVm.navigate?.('up'); },
-            'Enter': () => { event.preventDefault(); communityPopupVm.confirmSelection?.(); },
-            'Tab': () => { if(communityPopupVm.isVisible) {event.preventDefault(); communityPopupVm.confirmSelection?.();} }, // Only prevent tab if popup is active
-            'Escape': () => communityPopupVm.hide?.()
-        };
-        actions[event.key]?.();
-    });
-}
-
-async function initializeCommunityHelper() {
-    if (communityHelperInitialized || !window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
-        return;
-    }
-    console.log("Extension: Attempting to initialize Community Helper.");
-
-    const targetLabelText = 'Δημοτική-Τοπική Κοινότητα';
-    const targetInput = findInputElementByLabelText(targetLabelText);
-
-    if (targetInput) {
-        console.log("Extension: Target input for Community Helper found:", targetInput);
-        // Static ID for now, see comment in fetchCommunityData for making it dynamic
-        const sLkpenId_id_for_fetch = "XrAHzIAvvQP8XPX2h8NHRQ==";
-        const communityData = await fetchCommunityData(sLkpenId_id_for_fetch);
-
-        if (communityData.length > 0) {
-            setupCommunityPopupForInput(targetInput, communityData);
-            handleCommunityInputInteraction(targetInput);
-            communityHelperInitialized = true; // Mark as initialized
-            console.log("Extension: Community Helper initialized.");
-        } else {
-            console.log("Extension: No community data for Community Helper.");
-        }
-    } else {
-        // console.log("Extension: Target input for Community Helper not found on this check.");
-    }
-}
-
-// --- Persistent Icon & Its Popup Functions ---
-function createPersistentIcon() {
-    if (document.getElementById('my-extension-persistent-icon')) return; // Already created
-
-    persistentIconElement = document.createElement('div'); // Use div for easier styling if SVG is complex
+    persistentIconElement = document.createElement('div');
     persistentIconElement.id = 'my-extension-persistent-icon';
-
-    // Basic styling, can be improved with an actual SVG icon
     persistentIconElement.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#333">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-        </svg>
-    `;
+        </svg>`;
     const iconStyle = persistentIconElement.style;
-    iconStyle.position = 'fixed';
-    iconStyle.bottom = '20px';
-    iconStyle.right = '20px';
+    iconStyle.position = 'fixed'; /* ... άλλες ιδιότητες CSS ... */
+    iconStyle.bottom = '15px';
+    iconStyle.right = '15px';
     iconStyle.width = '48px';
     iconStyle.height = '48px';
     iconStyle.borderRadius = '50%';
-    iconStyle.backgroundColor = '#f0f0f0'; // Example color
+    iconStyle.backgroundColor = 'rgba(255, 255, 255, 0.9)';
     iconStyle.display = 'flex';
     iconStyle.alignItems = 'center';
     iconStyle.justifyContent = 'center';
     iconStyle.cursor = 'pointer';
-    iconStyle.zIndex = '2147483646';
-    iconStyle.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-    // try { // In case browser.runtime.getURL is not available in all contexts as expected
-    //   persistentIconElement.src = browser.runtime.getURL('src/assets/persistent-icon.svg');
-    // } catch (e) {
-    //   console.warn("Extension: Could not load icon from assets. Using placeholder.", e);
-    //   persistentIconElement.textContent = "💡"; // Placeholder if SVG fails
-    //   iconStyle.padding = "10px";
-    //   iconStyle.fontSize = "24px";
-    // }
+    iconStyle.zIndex = '2147483640';
+    iconStyle.boxShadow = '0 3px 10px rgba(0,0,0,0.2)';
+    iconStyle.transition = 'transform 0.2s ease-out';
+
+    persistentIconElement.onmouseenter = () => { iconStyle.transform = 'scale(1.1)'; };
+    persistentIconElement.onmouseleave = () => { iconStyle.transform = 'scale(1)'; };
 
 
-    persistentIconElement.addEventListener('click', togglePersistentIconPopup);
+    persistentIconElement.addEventListener('click', async () => {
+      persistentIconPopupVm?.toggleVisibility();
+      if (persistentIconPopupVm?.isVisible) { // Αν το popup έγινε ορατό
+        await sendMessage('popup-visibility-changed', { visible: true });
+      } else {
+        await sendMessage('popup-visibility-changed', { visible: false });
+      }
+    });
     document.body.appendChild(persistentIconElement);
 
-    // Create container for the persistent icon's Vue popup (initially hidden)
+    iconBadgeElement = document.createElement('span');
+    /* ... CSS για το badge ... */
+    iconBadgeElement.id = 'my-extension-icon-badge';
+    const badgeStyle = iconBadgeElement.style;
+    badgeStyle.position = 'absolute';
+    badgeStyle.top = '0px';
+    badgeStyle.right = '0px';
+    badgeStyle.background = 'red'; // Default to red
+    badgeStyle.color = 'white';
+    badgeStyle.borderRadius = '10px';
+    badgeStyle.padding = '1px 5px';
+    badgeStyle.fontSize = '11px';
+    badgeStyle.fontWeight = 'bold';
+    badgeStyle.minWidth = '18px';
+    badgeStyle.textAlign = 'center';
+    badgeStyle.lineHeight = '16px';
+    badgeStyle.display = 'none'; // Initially hidden
+    badgeStyle.pointerEvents = 'none';
+    persistentIconElement.appendChild(iconBadgeElement);
+
     persistentIconPopupContainer = document.createElement('div');
     persistentIconPopupContainer.id = 'persistent-icon-popup-root';
     document.body.appendChild(persistentIconPopupContainer);
 
-    const piniaInstance = createPinia(); // Create a Pinia instance for this app
-
-    persistentIconVueApp = createApp(PersistentIconPopup, {});
-    persistentIconVueApp.use(piniaInstance); // Use Pinia for this Vue app
+    // Το PersistentIconPopup θα χρησιμοποιήσει το τοπικό Pinia store
+    // που ενημερώνεται από το background.
+    persistentIconVueApp = createApp(PersistentIconPopup);
+    persistentIconVueApp.use(piniaInstanceForContentScript); // Χρήση του τοπικού Pinia
     persistentIconPopupVm = persistentIconVueApp.mount(persistentIconPopupContainer);
 }
 
-function togglePersistentIconPopup() {
-    if (persistentIconPopupVm?.toggleVisibility) {
-        persistentIconPopupVm.toggleVisibility();
-    }
+function updateIconBadgeOnUI(counters: BackgroundState['changeCounters']) {
+  if (!iconBadgeElement) return;
+  const { newErrors, newWarnings, newInfos, removedMessages } = counters;
+  const totalNew = newErrors + newWarnings + newInfos;
+
+  if (totalNew > 0) {
+      iconBadgeElement.textContent = totalNew.toString();
+      iconBadgeElement.style.display = 'flex';
+      iconBadgeElement.style.justifyContent = 'center';
+      iconBadgeElement.style.alignItems = 'center';
+      if (newErrors > 0) iconBadgeElement.style.backgroundColor = 'red';
+      else if (newWarnings > 0) iconBadgeElement.style.backgroundColor = 'orange';
+      else iconBadgeElement.style.backgroundColor = 'dodgerblue';
+  } else if (removedMessages > 0 && totalNew === 0) {
+      iconBadgeElement.textContent = `-${removedMessages}`;
+      iconBadgeElement.style.backgroundColor = 'green';
+      iconBadgeElement.style.display = 'flex';
+      iconBadgeElement.style.justifyContent = 'center';
+      iconBadgeElement.style.alignItems = 'center';
+  } else {
+      iconBadgeElement.style.display = 'none';
+  }
 }
 
-// --- Main Initialization and Observation ---
-function main() {
-    if (!window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
-        return;
+function setupErrorNotificationSystemOnUI() {
+  if (errorNotificationContainer) return;
+  errorNotificationContainer = document.createElement('div');
+  errorNotificationContainer.id = 'my-extension-error-notification-root';
+  document.body.appendChild(errorNotificationContainer);
+
+  errorNotificationVueApp = createApp(ErrorNotification);
+  // Το ErrorNotification δεν χρειάζεται άμεση πρόσβαση στο store εδώ,
+  // θα καλείται η μέθοδός του showErrorNotifications από το onMessage.
+  errorNotificationVm = errorNotificationVueApp.mount(errorNotificationContainer);
+}
+
+
+// --- Επικοινωνία με το Background Script ---
+async function requestInitialStateFromBackground() {
+  try {
+    const initialState = await sendMessage('get-initial-state', undefined); // undefined αντί για tabId
+    if (initialState) {
+      // console.log("Extension (CS): Received initial state from BG:", initialState);
+      localBackgroundState.value = initialState;
+      // Ενημέρωση του τοπικού store με τα αρχικά δεδομένα
+      localMessageStore.currentApplicationId = initialState.currentApplicationId;
+      localMessageStore.messages = initialState.messages;
+      localMessageStore.isLoading = initialState.isLoading;
+      localMessageStore.lastError = initialState.lastError;
+      localMessageStore.changeCounters = initialState.changeCounters;
+      updateIconBadgeOnUI(initialState.changeCounters);
     }
+  } catch (e) {
+    console.error("Extension (CS): Error requesting initial state:", e);
+    localBackgroundState.value.isLoading = false; // Σταμάτα το loading σε περίπτωση σφάλματος
+  }
+}
 
-    // Create the persistent icon as soon as the content script runs on a matching page
-    createPersistentIcon();
+// Listeners για μηνύματα από το background
+onMessage('state-updated', ({ data }) => {
+  // console.log("Extension (CS): Received state-updated from BG:", data);
+  localBackgroundState.value = data;
+  // Ενημέρωση του τοπικού store
+  localMessageStore.currentApplicationId = data.currentApplicationId;
+  localMessageStore.messages = data.messages;
+  localMessageStore.isLoading = data.isLoading;
+  localMessageStore.lastError = data.lastError;
+  localMessageStore.changeCounters = data.changeCounters; // Αυτό θα ενεργοποιήσει το watch στο τοπικό store
+  updateIconBadgeOnUI(data.changeCounters);
+});
 
-    // Attempt to initialize the community helper immediately
-    initializeCommunityHelper();
+onMessage('show-error-notifications', ({ data }) => {
+  if (errorNotificationVm?.showErrorNotifications) {
+    errorNotificationVm.showErrorNotifications(data);
+  }
+});
 
-    // Observe for dynamic changes in case the community input field loads later
-    const observer = new MutationObserver(() => {
-        if (!communityHelperInitialized) { // Only try to initialize if not already done
-            initializeCommunityHelper();
+// --- Παρακολούθηση URL (απλοποιημένη στο content script, στέλνει το URL στο background) ---
+let lastCheckedUrlForCS = "";
+function checkUrlAndNotifyBackground() {
+    const currentHref = window.location.href;
+    if (currentHref !== lastCheckedUrlForCS) {
+        lastCheckedUrlForCS = currentHref;
+        if (currentHref.startsWith("https://eae2024.opekepe.gov.gr/eae2024/")) {
+            sendMessage('url-changed-for-id-check', { url: currentHref })
+                .catch(e => console.warn("Extension (CS): Failed to send URL change to background", e));
         }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    }
 }
 
+
+// --- Κύρια Λογική Εκκίνησης στο Content Script ---
+async function mainContentScript() {
+  if (!window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
+    return;
+  }
+  // console.log("Extension (CS): mainContentScript() called.");
+
+  // Αρχικοποίηση τοπικού store (θα ενημερώνεται από το background)
+  localMessageStore = useMessageStore(piniaInstanceForContentScript);
+
+  setupPersistentIconAndBadge();
+  setupErrorNotificationSystemOnUI();
+  // initializeCommunityHelper(); // Προσπαθεί να αρχικοποιήσει το community helper UI
+  console.info("Extension (CS): mainContentScript() finished.");
+  await requestInitialStateFromBackground();
+
+  // Παρακολούθηση αλλαγών URL για SPAs
+  // Ο κύριος έλεγχος URL γίνεται στο background, αλλά στέλνουμε και από εδώ για σιγουριά
+  checkUrlAndNotifyBackground();
+  const navigationObserver = new MutationObserver(() => {
+      checkUrlAndNotifyBackground();
+      if (!communityHelperInitialized) {
+        // initializeCommunityHelper();
+      }
+  });
+  navigationObserver.observe(document.documentElement, { childList: true, subtree: true }); // Observe for SPA navigations
+  console.info("Extension (CS): Navigation observer started.");
+  // Για το hashchange που δεν πιάνει πάντα ο MutationObserver
+  window.addEventListener('hashchange', checkUrlAndNotifyBackground);
+  console.info("Extension (CS): Hashchange listener added.");
+}
+
+// Εκκίνηση
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', main);
+  document.addEventListener('DOMContentLoaded', mainContentScript);
 } else {
-    main();
+  mainContentScript();
 }

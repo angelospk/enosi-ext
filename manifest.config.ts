@@ -49,7 +49,8 @@ export default {
     "storage",      // If you need to store user preferences or cached data
     // "activeTab", // Generally useful, scripting might cover needs
     // "scripting", // If you need to programmatically execute scripts from background
-    // "tabs",     // If you need to interact with tabs
+    "tabs",     // If you need to interact with tabs
+    "webNavigation", // If you need to interact with navigation
     // "background", // If background script has extensive tasks
     // "sidePanel", // If using side panel
   ],
