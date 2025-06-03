@@ -90,6 +90,13 @@ declare global {
   const mapWritableState: typeof import('pinia')['mapWritableState']
   const markRaw: typeof import('vue')['markRaw']
   const middleware: typeof import('../utils/router/middleware')['middleware']
+  const mockAllKnowledgeData: typeof import('../utils/mockData')['mockAllKnowledgeData']
+  const mockExtensionSettings: typeof import('../utils/mockData')['mockExtensionSettings']
+  const mockPermanentlyDismissedIds: typeof import('../utils/mockData')['mockPermanentlyDismissedIds']
+  const mockPermanentlyDismissedMessagesFull: typeof import('../utils/mockData')['mockPermanentlyDismissedMessagesFull']
+  const mockPreviousYearData: typeof import('../utils/mockData')['mockPreviousYearData']
+  const mockRecentAndPopular: typeof import('../utils/mockData')['mockRecentAndPopular']
+  const mockSystemMessages: typeof import('../utils/mockData')['mockSystemMessages']
   const nextTick: typeof import('vue')['nextTick']
   const notivue: typeof import('../utils/notifications')['notivue']
   const onActivated: typeof import('vue')['onActivated']
@@ -392,6 +399,9 @@ declare global {
   export type { ProcessedMessage } from '../stores/messages.store'
   import('../stores/messages.store')
   // @ts-ignore
+  export type { MockExtensionSettings, MockKnowledgeItem } from '../utils/mockData'
+  import('../utils/mockData')
+  // @ts-ignore
   export type { ShortcutConfig, ShortcutsConfig, ShortcutsOptions } from '../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.d'
   import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.d')
   // @ts-ignore
@@ -481,6 +491,13 @@ declare module 'vue' {
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly mockAllKnowledgeData: UnwrapRef<typeof import('../utils/mockData')['mockAllKnowledgeData']>
+    readonly mockExtensionSettings: UnwrapRef<typeof import('../utils/mockData')['mockExtensionSettings']>
+    readonly mockPermanentlyDismissedIds: UnwrapRef<typeof import('../utils/mockData')['mockPermanentlyDismissedIds']>
+    readonly mockPermanentlyDismissedMessagesFull: UnwrapRef<typeof import('../utils/mockData')['mockPermanentlyDismissedMessagesFull']>
+    readonly mockPreviousYearData: UnwrapRef<typeof import('../utils/mockData')['mockPreviousYearData']>
+    readonly mockRecentAndPopular: UnwrapRef<typeof import('../utils/mockData')['mockRecentAndPopular']>
+    readonly mockSystemMessages: UnwrapRef<typeof import('../utils/mockData')['mockSystemMessages']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>

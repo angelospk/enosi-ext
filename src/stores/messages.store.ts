@@ -7,7 +7,10 @@ export interface ProcessedMessage {
   rawText: string;
   cleanedText: string; // Κείμενο χωρίς το (Α/Α...)
   type: 'Error' | 'Warning' | 'Info';
+<<<<<<< Updated upstream
   relatedItemIds: string[]; // IDs από το (Α/Α...)
+=======
+>>>>>>> Stashed changes
   firstSeen: number; // Timestamp
   lastSeen: number;  // Timestamp
   isDismissedOnce?: boolean; // Για απόρριψη στην τρέχουσα συνεδρία
