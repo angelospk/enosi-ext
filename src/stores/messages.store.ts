@@ -7,10 +7,6 @@ export interface ProcessedMessage {
   rawText: string;
   cleanedText: string; // Κείμενο χωρίς το (Α/Α...)
   type: 'Error' | 'Warning' | 'Info';
-<<<<<<< Updated upstream
-  relatedItemIds: string[]; // IDs από το (Α/Α...)
-=======
->>>>>>> Stashed changes
   firstSeen: number; // Timestamp
   lastSeen: number;  // Timestamp
   isDismissedOnce?: boolean; // Για απόρριψη στην τρέχουσα συνεδρία
@@ -41,13 +37,6 @@ function categorizeMessage(text: string): ProcessedMessage['type'] {
   return 'Warning'; // Προεπιλογή, μπορείς να το αλλάξεις σε 'Info' αν προτιμάς
 }
 
-function extractRelatedIds(text: string): string[] {
-  const match = text.match(/\((?:Α\/Α [^:]+:|A\/A [^:]+:)\s*([^)]+)\)/);
-  if (match && match[1]) {
-    return match[1].split(',').map(id => id.trim()).filter(id => id.length > 0);
-  }
-  return [];
-}
 
 function cleanMessageText(rawText: string): string {
   return rawText.replace(/\s*\((?:Α\/Α [^:]+:|A\/A [^:]+:)\s*[^)]+\)$/, '').trim();
@@ -125,7 +114,6 @@ export const useMessageStore = defineStore('messages', () => {
         existingMessage.rawText = rawText; // Ενημέρωση κειμένου αν έχει αλλάξει ελαφρώς
         existingMessage.cleanedText = cleanMessageText(rawText);
         existingMessage.type = messageType; // Επαν-κατηγοριοποίηση
-        existingMessage.relatedItemIds = extractRelatedIds(rawText);
         existingMessage.isDismissedOnce = false; // Επαναφορά απόρριψης συνεδρίας
         newProcessedMessages.push(existingMessage);
       } else {
@@ -135,7 +123,6 @@ export const useMessageStore = defineStore('messages', () => {
           rawText,
           cleanedText: cleanMessageText(rawText),
           type: messageType,
-          relatedItemIds: extractRelatedIds(rawText),
           firstSeen: now,
           lastSeen: now,
           isDismissedOnce: false,

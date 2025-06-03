@@ -34,7 +34,6 @@ export const mockSystemMessages: ProcessedMessage[] = [
     rawText: "Σφάλμα: Πρέπει να εισάγετε τιμή στα πεδία [Πιστωτικό Ίδρυμα] και [ΙΒΑΝ]. (Α/Α αγροτεμαχίων: 101, 102)",
     cleanedText: "Πρέπει να εισάγετε τιμή στα πεδία [Πιστωτικό Ίδρυμα] και [ΙΒΑΝ].",
     type: 'Error',
-    relatedItemIds: ['101', '102'],
     firstSeen: Date.now() - 300000, // 5 λεπτά πριν
     lastSeen: Date.now() - 60000,   // 1 λεπτό πριν
     originalIndex: 0,
@@ -44,7 +43,6 @@ export const mockSystemMessages: ProcessedMessage[] = [
     rawText: "Προειδοποίηση: Έχετε επιλέξει ΝΑΙ σε ενεργοποίηση δικαιωμάτων και δεν έχετε αιτηθεί 0401.",
     cleanedText: "Έχετε επιλέξει ΝΑΙ σε ενεργοποίηση δικαιωμάτων και δεν έχετε αιτηθεί 0401.",
     type: 'Warning',
-    relatedItemIds: ['0401'],
     firstSeen: Date.now() - 240000, // 4 λεπτά πριν
     lastSeen: Date.now() - 120000,  // 2 λεπτά πριν
     originalIndex: 1,
@@ -54,7 +52,6 @@ export const mockSystemMessages: ProcessedMessage[] = [
     rawText: "Ενημερωτικό μήνυμα: Η επεξεργασία της αίτησης ολοκληρώθηκε.",
     cleanedText: "Η επεξεργασία της αίτησης ολοκληρώθηκε.",
     type: 'Info',
-    relatedItemIds: [],
     firstSeen: Date.now() - 180000, // 3 λεπτά πριν
     lastSeen: Date.now() - 180000,
     originalIndex: 2,
@@ -64,7 +61,6 @@ export const mockSystemMessages: ProcessedMessage[] = [
     rawText: "Σφάλμα: Δεν επιτρέπεται η δήλωση καλλιέργειας με χαρακτηρισμό [ΠΟΤΙΣΤΙΚΟ] σε μη αρδευόμενο αγροτεμάχιο. (Α/Α αγροτεμαχίων: 1)",
     cleanedText: "Δεν επιτρέπεται η δήλωση καλλιέργειας με χαρακτηρισμό [ΠΟΤΙΣΤΙΚΟ] σε μη αρδευόμενο αγροτεμάχιο.",
     type: 'Error',
-    relatedItemIds: ['1'],
     firstSeen: Date.now() - 10000, // 10 δευτερόλεπτα πριν (πιο πρόσφατο)
     lastSeen: Date.now(),
     originalIndex: 3,
@@ -74,7 +70,6 @@ export const mockSystemMessages: ProcessedMessage[] = [
     rawText: "Προειδοποίηση: Ελέγξτε την καλλιέργεια. (Α/Α αγροτεμαχίων: 101, 202)",
     cleanedText: "Ελέγξτε την καλλιέργεια.",
     type: 'Warning',
-    relatedItemIds: ['101', '202'],
     firstSeen: Date.now() - 30000,
     lastSeen: Date.now() - 15000,
     originalIndex: 4,
@@ -86,7 +81,7 @@ export const mockPermanentlyDismissedIds: string[] = ['info_old_mock_dismissed']
 
 // Αν θέλεις να δείχνεις το κείμενο των αγνοημένων:
 export const mockPermanentlyDismissedMessagesFull: ProcessedMessage[] = [
-    { id: 'info_old_mock_dismissed', rawText: "Παλιό ενημερωτικό που αγνοήθηκε μόνιμα.", cleanedText: "Παλιό ενημερωτικό που αγνοήθηκε μόνιμα.", type: 'Info' /* ή 'Dismissed' */, relatedItemIds: [], firstSeen:0,lastSeen:0, originalIndex: 99 },
+    { id: 'info_old_mock_dismissed', rawText: "Παλιό ενημερωτικό που αγνοήθηκε μόνιμα.", cleanedText: "Παλιό ενημερωτικό που αγνοήθηκε μόνιμα.", type: 'Info' /* ή 'Dismissed' */, firstSeen:0,lastSeen:0, originalIndex: 99 },
 ];
 
 
