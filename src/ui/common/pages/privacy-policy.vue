@@ -2,49 +2,37 @@
   <div>
     <RouterLinkUp />
 
-    <h1>Privacy Policy</h1>
+    <h1>Πολιτική Απορρήτου</h1>
     <p>
-      Your privacy is important to us. This privacy policy explains what
-      personal data we collect, how we use it, and your rights regarding your
-      information.
+      Η απορρήτου σας είναι σημαντική για μας. Αυτή η πολιτική απορρήτου εξηγεί τι προσωπικά δεδομένα συλλέγουμε, πώς τα χρησιμοποιούμε και τα δικαίωμα σας σχετικά με τα δεδομένα σας.
+    </p>
+    
+    <h2>Πληροφορίες που συλλέγουμε</h2>
+    <p>
+      Συλλέγουμε πληροφορίες που παρέχετε στον εκτελεστή μας, όπως όταν δημιουργείτε έναν λογαριασμό, συνδρομείτε στον ηλεκτρονικό διαδίκτυο μας, ή επικοινωνείτε με την υποστήριξη μας. Αυτές οι πληροφορίες μπορεί να περιλαμβάνουν το όνομά σας, το email σας και άλλες πληροφορίες επικοινωνίας.
     </p>
 
-    <h2>Information We Collect</h2>
+    <h2>Πώς χρησιμοποιούμε τα πληροφορίες σας</h2>
     <p>
-      We collect information that you provide directly to us, such as when you
-      create an account, subscribe to our newsletter, or contact customer
-      support. This information may include your name, email address, and other
-      contact details.
+      Χρησιμοποιούμε τα πληροφορίες σας για να παρέχουμε και να βελτιώσουμε τους υπηρεσίες μας, να απαντήσουμε στις ερωτήσεις σας, να στείλουμε ειδοποιήσεις και να συνομιλούμε με σας για τους υπηρεσίες μας.
     </p>
 
-    <h2>How We Use Your Information</h2>
+    <h2>Χρήση των πληροφοριών σας</h2>
     <p>
-      We use your information to provide and improve our services, respond to
-      your inquiries, send notifications, and communicate with you about our
-      services.
+      Δεν πωλούμε, διακινδυνοποιούμε ή διανορίζουμε τα προσωπικά δεδομένα σας σε άλλους. Μπορούμε να μοιραστούμε τα πληροφορίες σας με πιστεύουμε τρίτους που βοηθούν μας στην εκτέλεση του website, την εκτελεσιμότητα του business μας ή την υπηρεσία σας, όσον αφορά τον καθορισμό των πληροφοριών σας ως καθισταμένο να παρέχουν την προσωπική απορρήτου σας.
     </p>
 
-    <h2>Sharing Your Information</h2>
+    <h2>Δικαίωμα σας</h2>
     <p>
-      We do not sell, trade, or rent your personal information to others. We may
-      share your information with trusted third parties who assist us in
-      operating our website, conducting our business, or servicing you, as long
-      as those parties agree to keep this information confidential.
-    </p>
-
-    <h2>Your Rights</h2>
-    <p>
-      You have the right to request access to the personal information we hold
-      about you, to request that we correct any inaccuracies, and to request
-      that we delete your personal information.
+      Έχετε δικαίωμα να αιτηθείτε πρόσβαση στα προσωπικά δεδομένα που κρατάμε για εσάς, να αιτηθείτε την αλλαγή των ακριβειών και να αιτηθείτε την διαγραφή των προσωπικών δεδομένων σας.
     </p>
     <p>
-      For more information or to exercise these rights, please contact us at:
+      Για περισσότερες πληροφορίες ή για την εκτελείστε αυτά τα δικαίωμα, παρακαλώ επικοινωνήστε μας στο:
       <a
-        href="mailto:support@example.com"
+        href="mailto:angelos.papamichail@gmail.com"
         class="text-primary"
       >
-        support@example.com
+        angelos.papamichail@gmail.com
       </a>
     </p>
   </div>

@@ -2,29 +2,25 @@
   <div>
     <RouterLinkUp />
 
-    <h1>Help & Support</h1>
+    <h1>Βοήθεια & Υποστήριξη</h1>
     <p>
-      Need assistance? We are here to help! For any issues or questions, you can
-      contact our support team at:
+      Αν χρειάζεστε βοήθεια; Είμαστε εδώ για να σε βοηθήσουμε! Για κάθε πρόβλημα ή ερώτηση, μπορείτε να επικοινωνήσετε με την ομάδα υποστήριξης μας:
       <a
-        href="mailto:support@example.com"
+        href="mailto:angelos.papamichail@gmail.com"
         class="btn-link"
       >
-        support@example.com
-      </a>
+        angelos.papamichail@gmail.com
+      </a>  
     </p>
 
-    <p class="text-sm font-thin">
-      We strive to respond to all inquiries within 24 hours. Thank you for your
-      patience and understanding.
-    </p>
+
 
     <div class="flex gap-2">
-      <RouterLink to="/common/about">About Us</RouterLink>
+      <RouterLink to="/common/about">Σχετικά με εμάς</RouterLink>
 
-      <RouterLink to="/common/privacy-policy">Privacy Policy</RouterLink>
+      <RouterLink to="/common/privacy-policy">Πολιτική Απορρήτου</RouterLink>
 
-      <RouterLink to="/common/terms-of-service">Terms</RouterLink>
+      <RouterLink to="/common/terms-of-service">Όροι Χρήσης</RouterLink>
     </div>
   </div>
 </template>

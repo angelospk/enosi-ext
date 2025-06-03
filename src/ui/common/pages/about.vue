@@ -2,24 +2,22 @@
   <div>
     <RouterLinkUp />
 
-    <h1>About Us</h1>
+    <h1>Σχετικά με εμάς</h1>
 
     <p>
-      Welcome to our platform! We are dedicated to providing the best service to
-      our users. Our mission is to deliver high-quality products and exceptional
-      customer support.
+      Παρακαλώ κατανοήστε ότι η απορρήτου σας είναι σημαντική για μας. Αυτή η πολιτική απορρήτου εξηγεί τι προσωπικά δεδομένα συλλέγουμε, πώς τα χρησιμοποιούμε και τα δικαίωμα σας σχετικά με τα δεδομένα σας.
     </p>
 
-    <p>Thank you for choosing us. We look forward to serving you!</p>
+    <p>Ευχαριστούμε που επιλέξατε να χρησιμοποιήσετε την επεκτάση μας!</p>
 
     <div class="flex gap-2">
-      <RouterLink to="/common/change-log">Change Log</RouterLink>
+      <RouterLink to="/common/change-log">Αλλαγές</RouterLink>
 
-      <RouterLink to="/common/help">Help</RouterLink>
+      <RouterLink to="/common/help">Βοήθεια</RouterLink>
 
-      <RouterLink to="/common/privacy-policy">Privacy Policy</RouterLink>
+      <RouterLink to="/common/privacy-policy">Απορρήτου</RouterLink>
 
-      <RouterLink to="/common/terms-of-service">Terms</RouterLink>
+      <RouterLink to="/common/terms-of-service">Όροι Χρήσης</RouterLink>
     </div>
   </div>
 </template>

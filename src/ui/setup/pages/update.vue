@@ -7,11 +7,11 @@ const version = __VERSION__
   <div
     class="w-full h-full flex flex-col justify-center items-center text-center md:my-12"
   >
-    <h1>🎉 Updated! 🚀</h1>
+    <h1>🎉 Ενημερώθηκε! 🚀</h1>
     <p>
-      Thank you for installing {{ displayName }}! ❤️
+      {{ displayName }}! ❤️
       <br />
-      Now you can close this tab and start using the extension.
+      Παρακαλώ κλείστε την τρέχουσα καρτέλα και ξεκινήστε να χρησιμοποιείτε την επεκτάση.
     </p>
 
     <p>

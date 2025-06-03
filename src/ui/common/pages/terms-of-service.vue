@@ -2,13 +2,12 @@
   <div>
     <RouterLinkUp />
 
-    <h1>Terms of Service</h1>
+    <h1>Όροι Χρήσης</h1>
     <p>
-      Welcome to our platform. By accessing or using our services, you agree to
-      comply with and be bound by the following terms and conditions of use.
+      Παρακαλώ κατανοήστε ότι η απορρήτου σας είναι σημαντική για μας. Αυτή η πολιτική απορρήτου εξηγεί τι προσωπικά δεδομένα συλλέγουμε, πώς τα χρησιμοποιούμε και τα δικαίωμα σας σχετικά με τα δεδομένα σας.
     </p>
 
-    <h2>Use of Our Service</h2>
+    <h2>Χρήση της υπηρεσίας μας</h2>
     <p>
       You agree to use our services only for lawful purposes and in a way that
       does not infringe the rights of, restrict, or inhibit anyone else's use
