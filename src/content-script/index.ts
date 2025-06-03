@@ -1,5 +1,4 @@
 import { createApp, App as VueApp, ref, watch as vueWatch, nextTick } from 'vue';
-import CommunityPopup from '../components/CommunityPopup.vue';
 import PersistentIconPopup from '../components/PersistentIconPopup.vue';
 import ErrorNotification from '../components/ErrorNotification.vue';
 import { createPinia, Pinia, Store } from 'pinia'; // Θα χρησιμοποιήσουμε ένα "dummy" store στο content-script
@@ -28,11 +27,10 @@ let localMessageStore: ReturnType<typeof useMessageStore>; // Τοπικό store
 
 
 // Vue app instances (παραμένουν)
-let communityVueApp: VueApp<Element> | null = null;
-let communityPopupVm: any = null;
-let communityPopupContainer: HTMLDivElement | null = null;
-let currentCommunityTargetInput: HTMLInputElement | null = null;
-let communityHelperInitialized = false;
+
+
+
+
 
 let persistentIconVueApp: VueApp<Element> | null = null;
 let persistentIconPopupVm: any = null;
@@ -232,9 +230,6 @@ async function mainContentScript() {
   checkUrlAndNotifyBackground();
   const navigationObserver = new MutationObserver(() => {
       checkUrlAndNotifyBackground();
-      if (!communityHelperInitialized) {
-        // initializeCommunityHelper();
-      }
   });
   navigationObserver.observe(document.documentElement, { childList: true, subtree: true }); // Observe for SPA navigations
   console.info("Extension (CS): Navigation observer started.");

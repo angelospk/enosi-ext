@@ -10,7 +10,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppFooter: typeof import('./../components/AppFooter.vue')['default']
     AppHeader: typeof import('./../components/AppHeader.vue')['default']
-    CommunityPopup: typeof import('./../components/CommunityPopup.vue')['default']
     DisplayError: typeof import('./../components/state/DisplayError.vue')['default']
     ErrorNotification: typeof import('./../components/ErrorNotification.vue')['default']
     LoadingSpinner: typeof import('./../components/state/LoadingSpinner.vue')['default']
@@ -20,14 +19,6 @@ declare module 'vue' {
     RouterLinkUp: typeof import('./../components/RouterLinkUp.vue')['default']
     RouterView: typeof import('vue-router')['RouterView']
     TailwindEmptyState: typeof import('./../components/state/tailwind-empty-state.vue')['default']
-    TestComponent: typeof import('./../components/TestComponent.vue')['default']
     ThemeSwitch: typeof import('./../components/ThemeSwitch.vue')['default']
-    UApp: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/App.vue')['default']
-    UButton: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/Button.vue')['default']
-    UCard: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
-    UForm: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/Form.vue')['default']
-    UFormField: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/FormField.vue')['default']
-    UInput: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/Input.vue')['default']
-    USwitch: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/Switch.vue')['default']
   }
 }
