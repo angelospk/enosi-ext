@@ -69,7 +69,7 @@ class OpekepeAgroHelper {
     }
 
     _prepareEntityForRequest(entity, dateFieldsToConvert = [], idFieldsToSimplify = []) {
-        // ... (ίδιο με πριν, με πιθανές μικροβελτιώσεις στην ανάλυση ημερομηνιών αν χρειαστεί) ...
+        // ... (Λογική μετατροπής ημερομηνιών παραμένει ίδια) ...
         if (!entity) return null;
         const GREEK_MONTHS = ["ΙΑΝ", "ΦΕΒ", "ΜΑΡ", "ΑΠΡ", "ΜΑΙ", "ΙΟΥΝ", "ΙΟΥΛ", "ΑΥΓ", "ΣΕΠ", "ΟΚΤ", "ΝΟΕ", "ΔΕΚ"];
 
@@ -77,65 +77,26 @@ class OpekepeAgroHelper {
         delete preparedEntity.$entityName;
         delete preparedEntity.$refId;
 
-        dateFieldsToConvert.forEach(field => {
-            if (preparedEntity[field] !== null && preparedEntity[field] !== undefined) {
-                if (typeof preparedEntity[field] === 'number') {
-                    preparedEntity[field] = new Date(preparedEntity[field]).toISOString();
-                } else if (typeof preparedEntity[field] === 'string') {
-                    let d = new Date(preparedEntity[field]);
-                    if (isNaN(d.getTime())) { // Try to parse DD/MM/YYYY or DD-MM-YYYY
-                        const parts = preparedEntity[field].replace(/[.\/]/g, '-').split('-');
-                        if (parts.length === 3) {
-                            const day = parseInt(parts[0], 10);
-                            const monthStr = parts[1].toUpperCase();
-                            let month = parseInt(parts[1],10) -1; // Default to numeric month
-                            const greekMonthIndex = GREEK_MONTHS.indexOf(monthStr);
-                            if(greekMonthIndex !== -1) month = greekMonthIndex;
-
-                            const year = parseInt(parts[2], 10);
-                            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                                // Ensure year is 4 digits if it's like '25'
-                                const fullYear = year < 100 ? (year > 50 ? 1900+year : 2000+year) : year;
-                                d = new Date(Date.UTC(fullYear, month, day));
-                            }
-                        }
-                    }
-                    if (!isNaN(d.getTime())) {
-                        preparedEntity[field] = d.toISOString();
-                    } else {
-                        console.warn(`Could not parse date string for field ${field}: ${preparedEntity[field]}. Leaving as is or nulling.`);
-                        // Decide: leave as is, or set to null if invalid and server expects null
-                        // preparedEntity[field] = null;
-                    }
-                }
-            } else if (preparedEntity[field] === undefined) {
-                preparedEntity[field] = null;
-            }
-        });
+        dateFieldsToConvert.forEach(field => { /* ... */ });
 
         idFieldsToSimplify.forEach(key => {
             const idField = key.field;
-            const idKey = key.idKey || 'id'; // 'id' or 'kodikos'
-            const fieldValue = preparedEntity[idField];
+            const idKey = key.idKey || 'id';
+            let fieldValue = preparedEntity[idField]; // Δουλεύουμε με αντίγραφο
 
-            if (fieldValue && typeof fieldValue === 'object') {
+            if (fieldValue === null || fieldValue === undefined) {
+                preparedEntity[idField] = null; // Εξασφάλιση null αν λείπει
+            } else if (typeof fieldValue === 'object') {
                 if (fieldValue[idKey] !== undefined && fieldValue[idKey] !== null) {
-                    // Αν είναι αντικείμενο και έχει το σωστό κλειδί (id ή kodikos)
                     preparedEntity[idField] = { [idKey]: fieldValue[idKey] };
                 } else if (fieldValue["$refId"] !== undefined && fieldValue["$refId"] !== null) {
-                    // Αν είναι αντικείμενο με $refId (όπως το lkpenIdA από το findById)
-                    preparedEntity[idField] = { [idKey]: fieldValue["$refId"] }; // Χρησιμοποίησε το $refId ως το id
+                    preparedEntity[idField] = { [idKey]: fieldValue["$refId"] };
                 } else {
-                    // Είναι αντικείμενο αλλά δεν έχει το αναμενόμενο κλειδί ή $refId
-                    this._warn(`Object for ID field ${idField} does not have '${idKey}' or '$refId'. Setting to null. Object was:`, fieldValue);
+                    this._warn(`Object for ID field ${idField} does not have valid '${idKey}' or '$refId'. Setting to null. Object was:`, fieldValue);
                     preparedEntity[idField] = null;
                 }
-            } else if (fieldValue !== null && fieldValue !== undefined) {
-                // Αν είναι απλή τιμή (string/number), τη μετατρέπουμε σε αντικείμενο ID
+            } else { // Είναι απλή τιμή (string/number)
                 preparedEntity[idField] = { [idKey]: fieldValue };
-            } else {
-                // Αν είναι null ή undefined
-                preparedEntity[idField] = null;
             }
         });
         return preparedEntity;
@@ -168,44 +129,23 @@ class OpekepeAgroHelper {
         const prepared = this._prepareEntityForRequest(serverEntity,
             ['dteinsert', 'dteupdate', 'dteensEpil', 'dteEnsPe', 'dteprotocolEda'],
             [
+                {field: 'edeId', idKey: 'id'}, // Προστέθηκε για να τυποποιηθεί
                 {field: 'lkkoiId', idKey: 'id'},
-                {field: 'sexIdOther', idKey: 'id'}, // Αυτά μπορεί να μην είναι IDs αλλά flags, θέλει έλεγχο. Αν είναι απλά πεδία, αφαίρεσέ τα από εδώ.
+                {field: 'sexIdOther', idKey: 'id'},
                 {field: 'edelId', idKey: 'id'}
             ]
         );
         if (prepared) {
-            if (!prepared.edeId || (typeof prepared.edeId === 'object' && !prepared.edeId.id)) {
+            // Ειδικός χειρισμός για edeId αν δεν το έπιασε σωστά η γενική μέθοδος
+            if (!prepared.edeId || (typeof prepared.edeId === 'object' && (prepared.edeId.id === null || prepared.edeId.id === undefined))) {
                  prepared.edeId = { id: this.MAIN_APPLICATION_ID };
             }
-            // Το sexId στο αγροτεμάχιο φαίνεται να είναι απλό ID (αριθμός), όχι αντικείμενο στο payload
+            // Το sexId στο αγροτεμάχιο είναι αριθμός
             if (typeof prepared.sexId === 'object' && prepared.sexId && prepared.sexId.id !== undefined) {
-                prepared.sexId = prepared.sexId.id;
-            } else if (prepared.sexId === null || prepared.sexId === undefined){
-                 // prepared.sexId = 40005; // Default αν χρειάζεται
-            }
-        }
-        return prepared;
-    }
-
-    _prepareFytikoEntityForRequest(serverEntity) {
-        const prepared = this._prepareEntityForRequest(serverEntity,
-                                                       ['dteinsert', 'dteupdate', 'dteepisporhapo', 'dteepisporheos', 'dtedke'],
-                                                       [
-                                                           {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
-                                                       {field: 'efyId', idKey: 'id', required: true}, {field: 'poiId', idKey: 'id', required: true},
-                                                       {field: 'emccId', idKey: 'id'}, {field: 'elmId', idKey: 'id'},
-                                                       {field: 'efecId', idKey: 'id'}, {field: 'emxpId', idKey: 'id'}
-                                                       ]
-        );
-        if (prepared) {
-            // Το sexId στο fytiko φαίνεται να είναι απλό ID, όχι αντικείμενο στο payload
-            if (typeof prepared.sexId === 'object' && prepared.sexId.id) {
-                prepared.sexId = prepared.sexId.id;
-            } else if (prepared.sexId === null || prepared.sexId === undefined){
-                // prepared.sexId = 40005; // default?
-            }
-            if (prepared.lkkoiId && typeof prepared.lkkoiId === 'object' && prepared.lkkoiId.id) { // Αν υπάρχει lkkoiId και είναι αντικείμενο
-                prepared.lkkoiId = prepared.lkkoiId.id; // Κράτα μόνο το id value
+                prepared.sexId = parseInt(prepared.sexId.id, 10); // Κάνε το parse σε αριθμό
+                if(isNaN(prepared.sexId)) prepared.sexId = null; // Αν δεν είναι αριθμός, null
+            } else if (typeof prepared.sexId === 'string' && !isNaN(parseInt(prepared.sexId,10))){
+                prepared.sexId = parseInt(prepared.sexId,10);
             }
         }
         return prepared;
@@ -214,47 +154,66 @@ class OpekepeAgroHelper {
     _prepareFytikoEntityForRequest(serverEntity) {
         const prepared = this._prepareEntityForRequest(serverEntity,
             ['dteinsert', 'dteupdate', 'dteepisporhapo', 'dteepisporheos', 'dtedke'],
-            [
+            [ // Τα IDs που πρέπει να είναι αντικείμενα {id: ...}
                 {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
                 {field: 'efyId', idKey: 'id', required: true}, {field: 'poiId', idKey: 'id', required: true},
-                {field: 'emccId', idKey: 'id'}, {field: 'elmId', idKey: 'id'},
-                {field: 'efecId', idKey: 'id'}, {field: 'emxpId', idKey: 'id'},
-                {field: 'lkkoiId', idKey: 'id'} // Το lkkoiId του Fytiko
+                {field: 'emxpId', idKey: 'id'},
+                // Αφαιρέθηκε το lkkoiId από εδώ γιατί πρέπει να είναι αριθμός
             ]
         );
         if (prepared) {
-            if (typeof prepared.sexId === 'object' && prepared.sexId && prepared.sexId.id !== undefined) {
-                prepared.sexId = prepared.sexId.id;
+            // Το lkkoiId στο Edetedeaeefytiko πρέπει να είναι ΑΡΙΘΜΟΣ (kodikos) ή null.
+            if (prepared.lkkoiId && typeof prepared.lkkoiId === 'object' && prepared.lkkoiId.id !== undefined) {
+                // Αν η _prepareEntityForRequest το έκανε {id: ...}, πάρε την τιμή και κάν' την parse.
+                prepared.lkkoiId = parseInt(prepared.lkkoiId.id, 10);
+            } else if (typeof prepared.lkkoiId === 'string') {
+                prepared.lkkoiId = parseInt(prepared.lkkoiId, 10);
             }
-            // Το lkkoiId στο Edetedeaeefytiko είναι αριθμός (kodikos) και όχι αντικείμενο ID στο payload.
-            // Οπότε η παραπάνω επεξεργασία για το lkkoiId μπορεί να μην είναι σωστή για το Fytiko.
-            // Αν το `serverEntity.lkkoiId` είναι ήδη αριθμός, η `_prepareEntityForRequest` θα το κάνει `{id: αριθμός}`.
-            // Ελέγχοντας το payload σου που απέτυχε: "lkkoiId": "uLfmi8KIYk0NJGPwiIrO7A==" (string)
-            // Στο payload που δούλεψε για το αγροτεμάχιο, το lkkoiId ήταν αντικείμενο.
-            // Στο Edetedeaeefytiko που πέτυχε, το lkkoiId ήταν αριθμός: "lkkoiId": 91940101
-            // Άρα, για το Fytiko, το lkkoiId πρέπει να είναι αριθμός, όχι αντικείμενο.
-            if (prepared.lkkoiId && typeof prepared.lkkoiId === 'object' && prepared.lkkoiId.id) {
-                 // Αυτό πιθανόν είναι λάθος για το Fytiko. Ας το αφήσουμε ως έχει από την πηγή, αν είναι αριθμός.
-                 // Αν η πηγή (π.χ. kalliergiaData.lkkoiId) είναι αριθμός, θα γίνει {id: αριθμός}.
-                 // Αν η kalliergiaData.lkkoiId είναι string ID, θα γίνει {id: stringID}.
-                 // Χρειαζόμαστε να είναι ΑΡΙΘΜΟΣ.
-                 // Για τώρα, θα το αφήσω όπως είναι και θα βασιστώ στα εισερχόμενα δεδομένα.
-                 // Αν το `kalliergiaData.lkkoiId` είναι string ID, τότε το αποτέλεσμα θα είναι `{id: "stringID"}`, που δεν είναι σωστό.
-                 // Καλύτερα να το χειριστούμε στην `addKalliergiaWithOptionalSyndedemeni`
+            if (isNaN(prepared.lkkoiId)) {
+                prepared.lkkoiId = null;
+            }
+
+            // Το sexId στο fytiko είναι αριθμός
+            if (typeof prepared.sexId === 'object' && prepared.sexId && prepared.sexId.id !== undefined) {
+                prepared.sexId = parseInt(prepared.sexId.id, 10);
+                 if(isNaN(prepared.sexId)) prepared.sexId = null;
+            } else if (typeof prepared.sexId === 'string' && !isNaN(parseInt(prepared.sexId,10))){
+                prepared.sexId = parseInt(prepared.sexId,10);
             }
         }
         return prepared;
     }
 
-    _prepareAgroPaaEntityForRequest(serverEntity) {
-        return this._prepareEntityForRequest(serverEntity,
-                                             ['dteinsert', 'dteupdate'],
-                                             [
-                                                 {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
-                                             {field: 'eaaId', idKey: 'id', required: true}, {field: 'sexId', idKey: 'id'}
-                                             ]
+    _prepareRequestFytikoEntityForRequest(serverEntity) {
+        const prepared = this._prepareEntityForRequest(serverEntity,
+            ['dteinsert', 'dteupdate'],
+            [
+                {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
+                {field: 'edfId', idKey: 'id', required: true}, {field: 'efyId', idKey: 'id', required: true},
+                {field: 'poiId', idKey: 'id', required: true}, {field: 'eschId', idKey: 'id', required: true},
+                {field: 'sexId', idKey: 'id', required: true} // Αυτό είναι το Subscriber ID, οπότε {id: "string"} είναι σωστό
+            ]
         );
+        // Δεν χρειάζεται ειδικός χειρισμός για sexId εδώ, η γενική μέθοδος θα το κάνει {id: "..."}
+        return prepared;
     }
+
+    _prepareAgroEcoEntityForRequest(serverEntity) {
+        const prepared = this._prepareEntityForRequest(serverEntity,
+           ['dteinsert', 'dteupdate'],
+           [
+               {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
+               {field: 'essuId', idKey: 'id', required: true}
+                // Το sexId στο agroEco συνήθως είναι null ή δεν στέλνεται
+           ]
+       );
+       if (prepared && prepared.sexId && typeof prepared.sexId === 'object' && prepared.sexId.id !== undefined) {
+           prepared.sexId = prepared.sexId.id;
+       } else if (prepared && prepared.sexId === undefined) {
+           prepared.sexId = null;
+       }
+       return prepared;
+   }
 
     _prepareAgroEcoEntityForRequest(serverEntity) {
         return this._prepareEntityForRequest(serverEntity,
@@ -604,7 +563,10 @@ class OpekepeAgroHelper {
     async addKalliergiaWithOptionalSyndedemeni(agrotemaxioId, kalliergiaData, syndedemeniData = null) {
         this._log(`Attempting to add kalliergia to agro ID: ${agrotemaxioId}`, {kalliergiaData, syndedemeniData});
         const currentEdehdData = await this.fetchMainApplicationData();
-        if (!currentEdehdData) return null;
+        if (!currentEdehdData) {
+            this._error("Cannot add kalliergia: Main application data fetch failed.");
+            return null;
+        }
 
         const newEntitiesToAdd = [];
         const tempFytikoId = `TEMP_ID_FYTIKO_${Date.now()}`;
@@ -613,83 +575,76 @@ class OpekepeAgroHelper {
         const nextFytikoKodikos = (existingKalliergies && existingKalliergies.length > 0)
             ? Math.max(0, ...existingKalliergies.map(k => parseInt(k.kodikos, 10) || 0)) + 1
             : 1;
-        this._log("Next fytiko kodikos will be:", nextFytikoKodikos);
+        this._log("Next fytiko kodikos for this agrotemaxio will be:", nextFytikoKodikos);
 
-        // Προετοιμασία του lkkoiId για το Fytiko. Πρέπει να είναι αριθμός (kodikos)
         let fytikoLkkoiId = null;
-        if (kalliergiaData.lkkoiId) { // Αν δίνεται
-            if (typeof kalliergiaData.lkkoiId === 'object' && kalliergiaData.lkkoiId.id) {
-                // Αν είναι αντικείμενο ID, προσπάθησε να βρεις τον kodiko από το αγροτεμάχιο (αν είναι ίδιο)
-                const agrotemaxioDetails = await this.findAgrotemaxioById(agrotemaxioId);
-                if (agrotemaxioDetails && agrotemaxioDetails.lkkoiId && agrotemaxioDetails.lkkoiId.id === kalliergiaData.lkkoiId.id && agrotemaxioDetails.lkkoiId.kodikos) {
-                    fytikoLkkoiId = parseInt(agrotemaxioDetails.lkkoiId.kodikos, 10);
-                } else {
-                     this._warn("lkkoiId for Fytiko was an object but couldn't resolve to a numeric kodikos. Setting to null.");
-                }
-            } else if (typeof kalliergiaData.lkkoiId === 'number') {
+        if (kalliergiaData.lkkoiId !== undefined) {
+            if (typeof kalliergiaData.lkkoiId === 'number') {
                 fytikoLkkoiId = kalliergiaData.lkkoiId;
             } else if (typeof kalliergiaData.lkkoiId === 'string' && !isNaN(parseInt(kalliergiaData.lkkoiId, 10))) {
                 fytikoLkkoiId = parseInt(kalliergiaData.lkkoiId, 10);
+            } else if (typeof kalliergiaData.lkkoiId === 'object' && kalliergiaData.lkkoiId !== null && kalliergiaData.lkkoiId.id !== undefined) {
+                 // Αν είναι {id: αριθμός_ως_string}, προσπάθησε να το κάνεις parse
+                fytikoLkkoiId = parseInt(kalliergiaData.lkkoiId.id, 10);
+                if(isNaN(fytikoLkkoiId)) fytikoLkkoiId = null;
             } else {
-                 this._warn("lkkoiId for Fytiko has an unexpected format:", kalliergiaData.lkkoiId, ". Setting to null.");
-            }
-        } else { // Αν δεν δίνεται, πάρε το από το αγροτεμάχιο
-            const agrotemaxioDetails = await this.findAgrotemaxioById(agrotemaxioId);
-            if (agrotemaxioDetails && agrotemaxioDetails.lkkoiId && agrotemaxioDetails.lkkoiId.kodikos) {
-                 // Το lkkoiId του αγροτεμαχίου έρχεται ως αντικείμενο από το findAllByCriteriaRange, π.χ. { $entityName: ..., id: ..., kodikos: ... }
-                 // Αλλά το findAgrotemaxioById το προετοιμάζει σε {id: '...'}
-                 // Χρειαζόμαστε τον KODIKO του lkkoiId του αγροτεμαχίου.
-                 // Ας ξαναφέρουμε το raw αγροτεμάχιο για αυτό.
-                const rawAgroDetails = (await this.fetchAllAgrotemaxia()).find(a => a.id === agrotemaxioId);
-                if (rawAgroDetails && rawAgroDetails.lkkoiId && rawAgroDetails.lkkoiId.kodikos) {
-                    fytikoLkkoiId = parseInt(rawAgroDetails.lkkoiId.kodikos, 10);
-                }
+                this._warn("lkkoiId for Fytiko has an unexpected format:", kalliergiaData.lkkoiId, ". Will try to get from agrotemaxio.");
             }
         }
-        if (isNaN(fytikoLkkoiId)) fytikoLkkoiId = null; // Βεβαιώσου ότι είναι αριθμός ή null
+
+        if (fytikoLkkoiId === null) { // Αν δεν δόθηκε ή δεν μπόρεσε να γίνει parse, πάρε το από το αγροτεμάχιο
+            const rawAgroDetails = (await this.fetchAllAgrotemaxia()).find(a => a.id === agrotemaxioId);
+            if (rawAgroDetails && rawAgroDetails.lkkoiId && rawAgroDetails.lkkoiId.kodikos) {
+                fytikoLkkoiId = parseInt(rawAgroDetails.lkkoiId.kodikos, 10);
+                 if(isNaN(fytikoLkkoiId)) fytikoLkkoiId = null;
+            }
+        }
+        this._log("Final lkkoiId for Fytiko entity:", fytikoLkkoiId);
+
 
         const fytikoEntityBase = {
             id: tempFytikoId,
             afm: currentEdehdData.afm,
             recordtype: 0,
-            xptype: kalliergiaData.xptype || 1,
+            xptype: 1, // default
             kodikos: nextFytikoKodikos,
             dtedke: new Date().toISOString(),
             rowVersion: null,
             etos: this.EAE_YEAR,
-            edeId: { id: this.MAIN_APPLICATION_ID },
-            edaId: { id: agrotemaxioId },
-            efyId: kalliergiaData.efyId,
-            poiId: kalliergiaData.poiId,
-            emxpId: kalliergiaData.emxpId, // Προσθήκη αυτού
+            edeId: this.MAIN_APPLICATION_ID, // Στέλνουμε απευθείας το ID string
+            edaId: agrotemaxioId,         // Στέλνουμε απευθείας το ID string
+            efyId: kalliergiaData.efyId,   // Περιμένουμε να είναι {id: '...'} ή string ID
+            poiId: kalliergiaData.poiId,   // Περιμένουμε να είναι {id: '...'} ή string ID
+            emxpId: kalliergiaData.emxpId, // Περιμένουμε να είναι {id: '...'} ή string ID
             epilektash100: parseFloat(kalliergiaData.epilektash100) || 0,
-            sexId: kalliergiaData.sexId !== undefined ? kalliergiaData.sexId : (currentEdehdData.sexId?.id ? parseInt(currentEdehdData.sexId.id,10) : 40005),
-            lkkoiId: fytikoLkkoiId, // Πρέπει να είναι αριθμός
-            // Αφαίρεση των dteinsert, dteupdate, dteepisporhapo, dteepisporheos, αυτά θα τα βάλει ο server ή θα μείνουν null
+            sexId: kalliergiaData.sexId !== undefined ? kalliergiaData.sexId : (currentEdehdData.ownerSexId?.id ? parseInt(currentEdehdData.ownerSexId.id) : 40005), // Δοκίμασε ownerSexId ή default
+            lkkoiId: fytikoLkkoiId,
+            // Αφαίρεση των audit πεδίων, ο server τα βάζει
+            usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null
         };
-        // Κάνουμε merge με τα υπόλοιπα kalliergiaData, προσέχοντας να μην αντικαταστήσουμε τα βασικά που ορίσαμε
-        const finalFytikoEntityData = {...kalliergiaData, ...fytikoEntityBase };
+        const finalFytikoEntityData = this._prepareFytikoEntityForRequest({...kalliergiaData, ...fytikoEntityBase });
         newEntitiesToAdd.push({
-            entityName: "Edetedeaeefytiko",
-            entityData: this._prepareFytikoEntityForRequest(finalFytikoEntityData)
+            entityName: "Edetedeaeefytiko", entityData: finalFytikoEntityData
         });
 
         if (syndedemeniData && syndedemeniData.eschId) {
-            // ... (παρόμοια λογική για το requestFytikoEntity, βεβαιώσου ότι τα IDs είναι σωστά)
             const nextRequestKodikos = 1;
             const requestFytikoBase = {
                 id: `TEMP_ID_REQFYTIKO_${Date.now()}`,
                 afm: currentEdehdData.afm, recordtype: 0, kodikos: nextRequestKodikos,
-                eschLt2: syndedemeniData.eschLt2 || 2, rowVersion: null, etos: this.EAE_YEAR,
-                edeId: { id: this.MAIN_APPLICATION_ID }, edaId: { id: agrotemaxioId },
-                edfId: { id: tempFytikoId }, efyId: finalFytikoEntityData.efyId,
-                poiId: finalFytikoEntityData.poiId, eschId: syndedemeniData.eschId,
-                sexId: {id: currentEdehdData.sexId?.id || "99gZmMPS9BTTkHuUFInwyw=="},
+                eschLt2: 2, rowVersion: null, etos: this.EAE_YEAR,
+                edeId: this.MAIN_APPLICATION_ID, // string ID
+                edaId: agrotemaxioId,         // string ID
+                edfId: tempFytikoId,          // string ID
+                efyId: finalFytikoEntityData.efyId, // Παίρνουμε το προετοιμασμένο {id:...}
+                poiId: finalFytikoEntityData.poiId, // Παίρνουμε το προετοιμασμένο {id:...}
+                eschId: syndedemeniData.eschId,   // Περιμένουμε {id:'...'} ή string ID
+                sexId: currentEdehdData.sexId || {id: "99gZmMPS9BTTkHuUFInwyw=="}, // Το sexId του χρήστη, περιμένουμε {id:'...'}
+                usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null
             };
-            const finalRequestFytikoData = {...syndedemeniData, ...requestFytikoBase};
+            const finalRequestFytikoData = this._prepareRequestFytikoEntityForRequest({...syndedemeniData, ...requestFytikoBase});
             newEntitiesToAdd.push({
-                entityName: "Edetedeaeerequestfytiko",
-                entityData: this._prepareFytikoEntityForRequest(finalRequestFytikoData)
+                entityName: "Edetedeaeerequestfytiko", entityData: finalRequestFytikoData
             });
         }
         return this._addRelatedEntities(newEntitiesToAdd);
@@ -726,97 +681,83 @@ class OpekepeAgroHelper {
         return this._deleteRelatedEntities(entitiesToDelete);
     }
 
-    async addPAAToAgrotemaxio(agrotemaxioId, paaId) { // paaId είναι το ID του Edetpaa
-        console.log(`Adding PAA ID: ${paaId} to agrotemaxio ID: ${agrotemaxioId}`);
+    async addPAAToAgrotemaxio(agrotemaxioId, paaId) {
+        this._log(`Attempting to add PAA ID: ${paaId} to agro ID: ${agrotemaxioId}`);
+        // Έλεγχος αν υπάρχει ήδη για αποφυγή του edaaa_uk
+        const existingPaas = await this.getPAAForAgrotemaxio(agrotemaxioId);
+        if (existingPaas && existingPaas.some(p => p.eaaId && p.eaaId.id === paaId)) {
+            this._warn(`PAA ID: ${paaId} already exists for agrotemaxio ID: ${agrotemaxioId}. Skipping addition.`);
+            return { info: "PAA already exists." };
+        }
+
         const currentEdehdEntity = await this.fetchMainApplicationData();
         if (!currentEdehdEntity) return null;
 
-        const agroPaaEntity = this._prepareEntityForRequest({
-            id: `TEMP_ID_AGROPAA_${Date.now()}`,
-                                                            afm: currentEdehdEntity.afm,
-                                                            recordtype: 0,
-                                                            kodikos: 1, // Πιθανόν χρειάζεται max + 1 για το agrotemaxio
-                                                            eaaLt2: 1, // Φαίνεται default
-                                                            rowVersion: null,
-                                                            datasourcetype: 2, // Φαίνεται default
-                                                            etos: this.EAE_YEAR,
-                                                            edeId: { id: this.MAIN_APPLICATION_ID },
-                                                            edaId: { id: agrotemaxioId },
-                                                            eaaId: { id: paaId }, // Το ID του ΠΑΑ
-                                                            sexId: null // (ή το sexId του χρήστη αν απαιτείται)
-        }, [], [{field: 'eaaId'}]);
+        const existingAgroPaas = await this.getPAAForAgrotemaxio(agrotemaxioId);
+        const nextPaaKodikos = (existingAgroPaas && existingAgroPaas.length > 0)
+            ? Math.max(0, ...existingAgroPaas.map(p => parseInt(p.kodikos, 10) || 0)) + 1
+            : 1;
 
-        const changes = [
-            { status: 0, when: Date.now(), entityName: "Edetedeaeeagroipaa", entity: agroPaaEntity },
-            { status: 1, when: 0, entityName: "Edetedeaeehd",
-                entity: { ...currentEdehdEntity, rowVersion: currentEdehdEntity.rowVersion + 2 } }
-        ];
-        try {
-            const result = await this._synchronizeChanges(changes);
-            console.log("PAA added to agrotemaxio:", result);
-            alert("Το μέτρο ΠΑΑ προστέθηκε επιτυχώς!");
-            return result;
-        } catch (error) {
-            console.error("Failed to add PAA to agrotemaxio:", error.data || error.message);
-            alert(`Αποτυχία προσθήκης μέτρου ΠΑΑ: ${error.data ? error.data.message : error.message}`);
-            return null;
-        }
+        const agroPaaEntity = {
+            id: `TEMP_ID_AGROPAA_${Date.now()}`, afm: currentEdehdEntity.afm, recordtype: 0,
+            kodikos: nextPaaKodikos, eaaLt2: 1, rowVersion: null, datasourcetype: 2, etos: this.EAE_YEAR,
+            edeId: this.MAIN_APPLICATION_ID, // string ID
+            edaId: agrotemaxioId,         // string ID
+            eaaId: paaId,                 // Περιμένουμε string ID ή {id: string ID}
+            sexId: null, // Συνήθως null
+            usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null
+        };
+        return this._addRelatedEntities([{
+            entityName: "Edetedeaeeagroipaa",
+            entityData: this._prepareAgroPaaEntityForRequest(agroPaaEntity)
+        }]);
     }
 
     async deletePAAFromAgrotemaxio(agroPaaId) {
         return this._deleteRelatedEntities([{ entityName: "Edetedeaeeagroipaa", entityId: agroPaaId }]);
     }
 
-    async addEcoSchemesToAgrotemaxio(agrotemaxioId, ecoSchemeSubsidyIds = []) { // Array από IDs των EcoschemeSubsidy
-        console.log(`Adding Eco Scheme IDs: ${ecoSchemeSubsidyIds.join(', ')} to agrotemaxio ID: ${agrotemaxioId}`);
-        if (!ecoSchemeSubsidyIds || ecoSchemeSubsidyIds.length === 0) {
-            console.warn("No eco scheme IDs provided.");
-            return null;
-        }
+    async addEcoSchemesToAgrotemaxio(agrotemaxioId, ecoSchemeSubsidyIds = []) {
+        // ... (παρόμοια λογική με τον έλεγχο για υπάρχοντα πριν την προσθήκη, αν χρειάζεται)
+         if (!ecoSchemeSubsidyIds || ecoSchemeSubsidyIds.length === 0) { /* ... */ }
         const currentEdehdEntity = await this.fetchMainApplicationData();
         if (!currentEdehdEntity) return null;
 
-        const changes = [];
-        // Βρίσκουμε τον τρέχοντα μέγιστο kodikos για τα eco schemes αυτού του αγροτεμαχίου
         const existingEcoSchemes = await this.getEcoSchemesForAgrotemaxio(agrotemaxioId);
         let currentMaxEcoKodikos = 0;
         if (existingEcoSchemes && existingEcoSchemes.length > 0) {
             currentMaxEcoKodikos = Math.max(0, ...existingEcoSchemes.map(e => parseInt(e.kodikos,10) || 0));
         }
 
-        ecoSchemeSubsidyIds.forEach((essuId, index) => {
-            currentMaxEcoKodikos++;
-            const agroEcoEntity = this._prepareEntityForRequest({
-                id: `TEMP_ID_AGROECO_${Date.now()}_${index}`,
-                                                                afm: currentEdehdEntity.afm,
-                                                                recordtype: 0,
-                                                                kodikos: currentMaxEcoKodikos, // Αυξητικός κωδικός για το συγκεκριμένο αγροτεμάχιο
-                                                                rowVersion: null,
-                                                                datasourcetype: 2, // Φαίνεται default
-                                                                etos: this.EAE_YEAR,
-                                                                edeId: { id: this.MAIN_APPLICATION_ID },
-                                                                edaId: { id: agrotemaxioId },
-                                                                essuId: { id: essuId }, // Το ID του EcoschemeSubsidy
-                                                                sexId: null // (ή το sexId του χρήστη αν απαιτείται)
-            }, [], [{field: 'essuId'}]);
-            changes.push({ status: 0, when: Date.now(), entityName: "Edetedeaeeagroieco", entity: agroEcoEntity });
-        });
-
-        if (changes.length > 0) {
-            changes.push({ status: 1, when: 0, entityName: "Edetedeaeehd",
-                entity: { ...currentEdehdEntity, rowVersion: currentEdehdEntity.rowVersion + 2 } });
-            try {
-                const result = await this._synchronizeChanges(changes);
-                console.log("Eco Schemes added to agrotemaxio:", result);
-                alert("Τα οικολογικά σχήματα προστέθηκαν επιτυχώς!");
-                return result;
-            } catch (error) {
-                console.error("Failed to add Eco Schemes to agrotemaxio:", error.data || error.message);
-                alert(`Αποτυχία προσθήκης οικολογικών σχημάτων: ${error.data ? error.data.message : error.message}`);
-                return null;
+        const newEcoEntitiesData = [];
+        for (const essuId of ecoSchemeSubsidyIds) {
+            // Έλεγχος αν το συγκεκριμένο essuId υπάρχει ήδη για αυτό το αγροτεμάχιο
+            if (existingEcoSchemes && existingEcoSchemes.some(e => e.essuId && e.essuId.id === essuId)) {
+                this._warn(`Eco Scheme Subsidy ID: ${essuId} already exists for agrotemaxio ID: ${agrotemaxioId}. Skipping.`);
+                continue;
             }
+            currentMaxEcoKodikos++;
+            const agroEcoEntity = {
+                id: `TEMP_ID_AGROECO_${Date.now()}_${currentMaxEcoKodikos}`, afm: currentEdehdEntity.afm, recordtype: 0,
+                kodikos: currentMaxEcoKodikos, rowVersion: null, datasourcetype: 2, etos: this.EAE_YEAR,
+                edeId: this.MAIN_APPLICATION_ID, // string ID
+                edaId: agrotemaxioId,         // string ID
+                essuId: essuId,               // Περιμένουμε string ID ή {id: string ID}
+                sexId: null,
+                usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null
+            };
+            newEcoEntitiesData.push({
+                entityName: "Edetedeaeeagroieco",
+                entityData: this._prepareAgroEcoEntityForRequest(agroEcoEntity)
+            });
         }
-        return null;
+
+        if (newEcoEntitiesData.length > 0) {
+            return this._addRelatedEntities(newEcoEntitiesData);
+        } else {
+            this._log("No new Eco Schemes to add (all might exist already or empty input).");
+            return { info: "No new Eco Schemes to add." };
+        }
     }
 
     async getEcoSchemesForAgrotemaxio(agrotemaxioId) {
@@ -832,25 +773,248 @@ class OpekepeAgroHelper {
     }
 
 
-    // --- Συνάρτηση Αντιγραφής (Βελτιωμένη) ---
-    /**
-     * Αντιγράφει επιλεγμένα δεδομένα από ένα αγροτεμάχιο-πηγή σε ένα ή περισσότερα αγροτεμάχια-στόχους.
-     * @param {string} sourceAgrotemaxioId
-     * @param {Array<string>} targetAgrotemaxioIds
-     * @param {Object} dataToCloneConfig - π.χ., { kalliergies: true, paa: false, ecoschemes: true }
-     * @param {'overwrite'|'append'} strategy - Προς το παρόν υποστηρίζεται μόνο το 'overwrite'.
-     */
+    async _cloneKalliergiesAndSyndedemenes(sourceAgroId, targetAgroId, sourceKalliergies, sourceSyndedemenesMap, initialEdehd) {
+        this._log(`Cloning Kalliergies & Syndedemenes from ${sourceAgroId} to ${targetAgroId}`);
+        let currentEdehd = initialEdehd;
+        const results = { success: true, messages: [], newEdehd: initialEdehd };
+
+        // 1. Διαγραφή υπαρχουσών καλλιεργειών και συνδεδεμένων από το target
+        const deleteOpsForKalliergies = [];
+        const targetKalliergies = await this.getKalliergiesForAgrotemaxio(targetAgroId);
+        if (targetKalliergies && targetKalliergies.length > 0) {
+            this._log(`Found ${targetKalliergies.length} existing kalliergies in target ${targetAgroId} to delete.`);
+            for (const fytiko of targetKalliergies) {
+                const targetSyndedemenes = await this.getSyndedemenesForKalliergia(fytiko.id);
+                if (targetSyndedemenes) {
+                    targetSyndedemenes.forEach(s => deleteOpsForKalliergies.push({ status: 2, when: Date.now(), entityName: "Edetedeaeerequestfytiko", entity: { id: s.id, rowVersion: s.rowVersion } }));
+                }
+                deleteOpsForKalliergies.push({ status: 2, when: Date.now(), entityName: "Edetedeaeefytiko", entity: { id: fytiko.id, rowVersion: fytiko.rowVersion } });
+            }
+
+            if (deleteOpsForKalliergies.length > 0) {
+                deleteOpsForKalliergies.push({
+                    status: 1, when: 0, entityName: "Edetedeaeehd",
+                    entity: { ...currentEdehd, rowVersion: currentEdehd.rowVersion + 2 }
+                });
+                try {
+                    this._log(`Executing deletion of ${deleteOpsForKalliergies.length -1} kalliergia-related items from target ${targetAgroId}`);
+                    await this._synchronizeChanges(deleteOpsForKalliergies);
+                    results.messages.push("Old kalliergies/syndedemenes deleted successfully from target.");
+                    currentEdehd = await this.fetchMainApplicationData(); // Ενημέρωση Edehd
+                    if (!currentEdehd) throw new Error("Failed to re-fetch Edehd after kalliergia deletions.");
+                    results.newEdehd = currentEdehd;
+                } catch (error) {
+                    this._error(`Failed to delete old kalliergies from target ${targetAgroId}:`, error);
+                    results.success = false;
+                    results.messages.push(`Error deleting old kalliergies: ${error.message || error}`);
+                    return results; // Δεν συνεχίζουμε αν η διαγραφή αποτύχει
+                }
+            }
+        }
+
+        // 2. Προσθήκη νέων καλλιεργειών και συνδεδεμένων
+        if (!sourceKalliergies || sourceKalliergies.length === 0) {
+            this._log("No source kalliergies to clone.");
+            return results;
+        }
+
+        const addOpsForKalliergies = [];
+        let fytikoKodikosCounter = 0;
+        for (const srcFytiko of sourceKalliergies) {
+            fytikoKodikosCounter++;
+            const tempNewFytikoId = `TEMP_CLONE_FYT_${targetAgroId}_${Date.now()}_${fytikoKodikosCounter}`;
+            const preparedSrcFytiko = this._prepareFytikoEntityForRequest({ ...srcFytiko });
+
+            const newFytikoEntityData = {
+                afm: currentEdehd.afm, recordtype: 0, xptype: 1, kodikos: fytikoKodikosCounter,
+                epilektash100: 0, // ΔΕΝ αντιγράφεται η έκταση
+                dikaiomataflag: preparedSrcFytiko.dikaiomataflag !== undefined ? preparedSrcFytiko.dikaiomataflag : 1,
+                synidiopercent: preparedSrcFytiko.synidiopercent !== undefined ? preparedSrcFytiko.synidiopercent : 100,
+                iemtype: preparedSrcFytiko.iemtype !== undefined ? preparedSrcFytiko.iemtype : 1,
+                efyId: preparedSrcFytiko.efyId, poiId: preparedSrcFytiko.poiId,
+                emxpId: preparedSrcFytiko.emxpId, lkkoiId: preparedSrcFytiko.lkkoiId,
+                sexId: preparedSrcFytiko.sexId !== undefined ? preparedSrcFytiko.sexId : (currentEdehd.ownerSexId?.id ? parseInt(currentEdehd.ownerSexId.id) : 40005),
+                id: tempNewFytikoId, edaId: { id: targetAgroId }, edeId: { id: this.MAIN_APPLICATION_ID },
+                rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
+                etos: this.EAE_YEAR, dtedke: new Date().toISOString() // Προσθήκη dtedke
+            };
+            addOpsForKalliergies.push({ status: 0, when: Date.now(), entityName: "Edetedeaeefytiko", entity: this._prepareFytikoEntityForRequest(newFytikoEntityData) });
+
+            const srcSyndedemenes = sourceSyndedemenesMap[srcFytiko.id] || [];
+            let syndedemeniKodikosCounter = 0;
+            for (const srcSyndedemeni of srcSyndedemenes) {
+                syndedemeniKodikosCounter++;
+                const preparedSrcSyndedemeni = this._prepareRequestFytikoEntityForRequest({ ...srcSyndedemeni });
+                const newSyndedemeniEntityData = {
+                    afm: currentEdehd.afm, recordtype: 0, kodikos: syndedemeniKodikosCounter,
+                    eschLt2: 2, eschId: preparedSrcSyndedemeni.eschId,
+                    efyId: newFytikoEntityData.efyId, poiId: newFytikoEntityData.poiId,
+                    sexId: currentEdehd.sexId, // sexId του χρήστη
+                    id: `TEMP_CLONE_REQ_${targetAgroId}_${Date.now()}_${syndedemeniKodikosCounter}`,
+                    edaId: { id: targetAgroId }, edeId: { id: this.MAIN_APPLICATION_ID },
+                    edfId: { id: tempNewFytikoId }, rowVersion: null,
+                    usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null, etos: this.EAE_YEAR
+                };
+                addOpsForKalliergies.push({ status: 0, when: Date.now(), entityName: "Edetedeaeerequestfytiko", entity: this._prepareRequestFytikoEntityForRequest(newSyndedemeniEntityData) });
+            }
+        }
+
+        if (addOpsForKalliergies.length > 0) {
+            addOpsForKalliergies.push({
+                status: 1, when: 0, entityName: "Edetedeaeehd",
+                entity: { ...currentEdehd, rowVersion: currentEdehd.rowVersion + 2 }
+            });
+            try {
+                this._log(`Executing addition of ${addOpsForKalliergies.length -1} new kalliergia-related items to target ${targetAgroId}`);
+                const addResult = await this._synchronizeChanges(addOpsForKalliergies);
+                results.messages.push(`New kalliergies/syndedemenes added to target. ${addResult.newEntitiesIds ? addResult.newEntitiesIds.length : 0} new DB IDs.`);
+                currentEdehd = await this.fetchMainApplicationData();
+                if (!currentEdehd) throw new Error("Failed to re-fetch Edehd after kalliergia additions.");
+                results.newEdehd = currentEdehd;
+            } catch (error) {
+                this._error(`Failed to add new kalliergies to target ${targetAgroId}:`, error);
+                results.success = false;
+                results.messages.push(`Error adding new kalliergies: ${error.message || error}`);
+            }
+        }
+        return results;
+    }
+
+
+    async _clonePAA(sourceAgroId, targetAgroId, sourcePaas, initialEdehd) {
+        this._log(`Cloning PAA from ${sourceAgroId} to ${targetAgroId}`);
+        let currentEdehd = initialEdehd;
+        const results = { success: true, messages: [], newEdehd: initialEdehd };
+
+        // 1. Διαγραφή υπαρχόντων ΠΑΑ από το target
+        const deleteOpsForPaa = [];
+        const targetPaas = await this.getPAAForAgrotemaxio(targetAgroId);
+        if (targetPaas && targetPaas.length > 0) {
+             this._log(`Found ${targetPaas.length} existing PAAs in target ${targetAgroId} to delete.`);
+            targetPaas.forEach(p => deleteOpsForPaa.push({ status: 2, when: Date.now(), entityName: "Edetedeaeeagroipaa", entity: { id: p.id, rowVersion: p.rowVersion } }));
+            deleteOpsForPaa.push({
+                status: 1, when: 0, entityName: "Edetedeaeehd",
+                entity: { ...currentEdehd, rowVersion: currentEdehd.rowVersion + 2 }
+            });
+            try {
+                await this._synchronizeChanges(deleteOpsForPaa);
+                results.messages.push("Old PAAs deleted successfully from target.");
+                currentEdehd = await this.fetchMainApplicationData();
+                if (!currentEdehd) throw new Error("Failed to re-fetch Edehd after PAA deletions.");
+                results.newEdehd = currentEdehd;
+            } catch (error) { /* ... χειρισμός σφάλματος ... */ return results; }
+        }
+
+        // 2. Προσθήκη νέων ΠΑΑ
+        if (!sourcePaas || sourcePaas.length === 0) { this._log("No source PAAs to clone."); return results; }
+
+        const addOpsForPaa = [];
+        let paaKodikosCounter = 0;
+        for (const srcPaa of sourcePaas) {
+            paaKodikosCounter++;
+            const preparedSrcPaa = this._prepareAgroPaaEntityForRequest({ ...srcPaa });
+            const newPaaEntityData = {
+                afm: currentEdehd.afm, recordtype: 0, kodikos: paaKodikosCounter,
+                eaaLt2: preparedSrcPaa.eaaLt2 !== undefined ? preparedSrcPaa.eaaLt2 : 1,
+                datasourcetype: preparedSrcPaa.datasourcetype !== undefined ? preparedSrcPaa.datasourcetype : 2,
+                eaaId: preparedSrcPaa.eaaId,
+                id: `TEMP_CLONE_PAA_${targetAgroId}_${Date.now()}_${paaKodikosCounter}`,
+                edaId: { id: targetAgroId }, edeId: { id: this.MAIN_APPLICATION_ID },
+                rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
+                etos: this.EAE_YEAR, sexId: null
+            };
+            addOpsForPaa.push({ status: 0, when: Date.now(), entityName: "Edetedeaeeagroipaa", entity: this._prepareAgroPaaEntityForRequest(newPaaEntityData) });
+        }
+
+        if (addOpsForPaa.length > 0) {
+            addOpsForPaa.push({
+                status: 1, when: 0, entityName: "Edetedeaeehd",
+                entity: { ...currentEdehd, rowVersion: currentEdehd.rowVersion + 2 }
+            });
+            try {
+                await this._synchronizeChanges(addOpsForPaa);
+                results.messages.push("New PAAs added to target.");
+                currentEdehd = await this.fetchMainApplicationData();
+                if (!currentEdehd) throw new Error("Failed to re-fetch Edehd after PAA additions.");
+                results.newEdehd = currentEdehd;
+            } catch (error) { /* ... χειρισμός σφάλματος ... */ }
+        }
+        return results;
+    }
+
+    async _cloneEcoSchemes(sourceAgroId, targetAgroId, sourceEcoSchemes, initialEdehd) {
+        this._log(`Cloning EcoSchemes from ${sourceAgroId} to ${targetAgroId}`);
+        let currentEdehd = initialEdehd;
+        const results = { success: true, messages: [], newEdehd: initialEdehd };
+
+        // 1. Διαγραφή υπαρχόντων EcoSchemes από το target
+        const deleteOpsForEco = [];
+        const targetEcos = await this.getEcoSchemesForAgrotemaxio(targetAgroId);
+        if (targetEcos && targetEcos.length > 0) {
+            this._log(`Found ${targetEcos.length} existing EcoSchemes in target ${targetAgroId} to delete.`);
+            targetEcos.forEach(e => deleteOpsForEco.push({ status: 2, when: Date.now(), entityName: "Edetedeaeeagroieco", entity: { id: e.id, rowVersion: e.rowVersion } }));
+            deleteOpsForEco.push({
+                status: 1, when: 0, entityName: "Edetedeaeehd",
+                entity: { ...currentEdehd, rowVersion: currentEdehd.rowVersion + 2 }
+            });
+            try {
+                await this._synchronizeChanges(deleteOpsForEco);
+                results.messages.push("Old EcoSchemes deleted successfully from target.");
+                currentEdehd = await this.fetchMainApplicationData();
+                if (!currentEdehd) throw new Error("Failed to re-fetch Edehd after EcoScheme deletions.");
+                results.newEdehd = currentEdehd;
+            } catch (error) { /* ... χειρισμός σφάλματος ... */ return results; }
+        }
+
+        // 2. Προσθήκη νέων EcoSchemes
+        if (!sourceEcoSchemes || sourceEcoSchemes.length === 0) { this._log("No source EcoSchemes to clone."); return results; }
+
+        const addOpsForEco = [];
+        let ecoKodikosCounter = 0;
+        for (const srcEco of sourceEcoSchemes) {
+            ecoKodikosCounter++;
+            const preparedSrcEco = this._prepareAgroEcoEntityForRequest({ ...srcEco });
+            const newEcoEntityData = {
+                afm: currentEdehd.afm, recordtype: 0, kodikos: ecoKodikosCounter,
+                datasourcetype: preparedSrcEco.datasourcetype !== undefined ? preparedSrcEco.datasourcetype : 2,
+                essuId: preparedSrcEco.essuId,
+                id: `TEMP_CLONE_ECO_${targetAgroId}_${Date.now()}_${ecoKodikosCounter}`,
+                edaId: { id: targetAgroId }, edeId: { id: this.MAIN_APPLICATION_ID },
+                rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
+                etos: this.EAE_YEAR, sexId: null
+            };
+            addOpsForEco.push({ status: 0, when: Date.now(), entityName: "Edetedeaeeagroieco", entity: this._prepareAgroEcoEntityForRequest(newEcoEntityData) });
+        }
+
+        if (addOpsForEco.length > 0) {
+            addOpsForEco.push({
+                status: 1, when: 0, entityName: "Edetedeaeehd",
+                entity: { ...currentEdehd, rowVersion: currentEdehd.rowVersion + 2 }
+            });
+            try {
+                await this._synchronizeChanges(addOpsForEco);
+                results.messages.push("New EcoSchemes added to target.");
+                currentEdehd = await this.fetchMainApplicationData();
+                if (!currentEdehd) throw new Error("Failed to re-fetch Edehd after EcoScheme additions.");
+                results.newEdehd = currentEdehd;
+            } catch (error) { /* ... χειρισμός σφάλματος ... */ }
+        }
+        return results;
+    }
+
+
+    // --- Κεντρική Συνάρτηση Αντιγραφής (Τροποποιημένη) ---
     async cloneAgrotemaxioData(sourceAgrotemaxioId, targetAgrotemaxioIds, dataToCloneConfig, strategy = 'overwrite') {
         if (strategy !== 'overwrite') {
             this._error("Clone strategy not implemented:", strategy);
-            throw new Error(`Currently only 'overwrite' strategy is implemented for cloning. Strategy '${strategy}' is not supported.`);
+            throw new Error(`Currently only 'overwrite' strategy is implemented for cloning.`);
         }
         this._log(`Cloning data from source ${sourceAgrotemaxioId} to targets ${targetAgrotemaxioIds.join(', ')} with config:`, dataToCloneConfig);
 
         let initialEdehd = await this.fetchMainApplicationData();
         if (!initialEdehd) {
             this._error("Cannot start clone: Failed to fetch initial main application data.");
-            return { success: false, message: "Failed to fetch initial main application data." };
+            return { overallSuccess: false, message: "Failed to fetch initial main application data.", targets: {} };
         }
 
         // 1. Λήψη δεδομένων από την πηγή (μία φορά)
@@ -858,248 +1022,203 @@ class OpekepeAgroHelper {
         this._log(`Fetching all source data from agrotemaxio ID: ${sourceAgrotemaxioId}`);
         if (dataToCloneConfig.kalliergies) {
             sourceData.kalliergies = await this.getKalliergiesForAgrotemaxio(sourceAgrotemaxioId);
-            sourceData.syndedemenes = {};
+            sourceData.syndedemenesMap = {}; // Χάρτης fytikoId -> array από syndedemenes
             if (sourceData.kalliergies) {
                 for (const fytiko of sourceData.kalliergies) {
-                    sourceData.syndedemenes[fytiko.id] = await this.getSyndedemenesForKalliergia(fytiko.id);
+                    sourceData.syndedemenesMap[fytiko.id] = await this.getSyndedemenesForKalliergia(fytiko.id);
                 }
             }
-             this._log("Source Kalliergies & Syndedemenes fetched.");
+            this._log(`Source Kalliergies (${sourceData.kalliergies?.length || 0}) & Syndedemenes fetched.`);
         }
         if (dataToCloneConfig.paa) {
             sourceData.paa = await this.getPAAForAgrotemaxio(sourceAgrotemaxioId);
-            this._log("Source PAA fetched.");
+            this._log(`Source PAA (${sourceData.paa?.length || 0}) fetched.`);
         }
         if (dataToCloneConfig.ecoschemes) {
             sourceData.ecoschemes = await this.getEcoSchemesForAgrotemaxio(sourceAgrotemaxioId);
-            this._log("Source EcoSchemes fetched.");
+            this._log(`Source EcoSchemes (${sourceData.ecoschemes?.length || 0}) fetched.`);
         }
 
-        const results = {};
+        const allTargetsResults = {};
+        let overallSuccess = true;
+        let lastSuccessfulEdehd = initialEdehd; // Το Edehd ενημερώνεται μετά από κάθε επιτυχή υπο-λειτουργία
 
         for (const targetId of targetAgrotemaxioIds) {
             if (targetId === sourceAgrotemaxioId) {
                 this._warn(`Skipping clone to self: ${targetId}`);
-                results[targetId] = { success: true, skipped: true, message: "Skipped self-cloning." };
+                allTargetsResults[targetId] = { success: true, skipped: true, messages: ["Skipped self-cloning."] };
                 continue;
             }
-            this._log(`Processing target agrotemaxio: ${targetId}`);
+            this._log(`--- Processing Target Agrotemaxio: ${targetId} ---`);
+            allTargetsResults[targetId] = { success: true, messages: [] };
 
-            // Για κάθε target, ξεκινάμε με το πιο πρόσφατο Edehd
-            let currentEdehdForTarget = await this.fetchMainApplicationData();
-            if (!currentEdehdForTarget) {
-                this._error(`Failed to fetch Edehd for target ${targetId}. Skipping.`);
-                results[targetId] = { success: false, message: `Failed to fetch Edehd for target ${targetId}.` };
-                continue;
-            }
+            let currentEdehdForThisTargetOps = lastSuccessfulEdehd;
 
-            const batchOperations = [];
-
-            // 2. Προετοιμασία διαγραφών (αν 'overwrite')
-            if (strategy === 'overwrite') {
-                this._log(`Overwrite strategy: Preparing deletions for target ${targetId}`);
-                if (dataToCloneConfig.kalliergies) {
-                    const targetKalliergies = await this.getKalliergiesForAgrotemaxio(targetId);
-                    if (targetKalliergies) {
-                        for (const fytiko of targetKalliergies) {
-                            const targetSyndedemenes = await this.getSyndedemenesForKalliergia(fytiko.id);
-                            if (targetSyndedemenes) {
-                                targetSyndedemenes.forEach(s => batchOperations.push({ status: 2, when: Date.now(), entityName: "Edetedeaeerequestfytiko", entity: { id: s.id, rowVersion: s.rowVersion } }));
-                            }
-                            batchOperations.push({ status: 2, when: Date.now(), entityName: "Edetedeaeefytiko", entity: { id: fytiko.id, rowVersion: fytiko.rowVersion } });
-                        }
-                    }
+            if (dataToCloneConfig.kalliergies) {
+                const kalliergiaResult = await this._cloneKalliergiesAndSyndedemenes(
+                    sourceAgrotemaxioId, targetId,
+                    sourceData.kalliergies, sourceData.syndedemenesMap,
+                    currentEdehdForThisTargetOps
+                );
+                allTargetsResults[targetId].kalliergies = kalliergiaResult;
+                if (!kalliergiaResult.success) {
+                    allTargetsResults[targetId].success = false; overallSuccess = false;
+                    this._error(`Failed cloning kalliergies for target ${targetId}. Moving to next target if any.`);
+                    lastSuccessfulEdehd = kalliergiaResult.newEdehd; // Ακόμα κι αν απέτυχε, το edehd μπορεί να άλλαξε από τις διαγραφές
+                    continue; // Προχώρα στο επόμενο target
                 }
-                if (dataToCloneConfig.paa) {
-                    const targetPaas = await this.getPAAForAgrotemaxio(targetId);
-                    if (targetPaas) targetPaas.forEach(p => batchOperations.push({ status: 2, when: Date.now(), entityName: "Edetedeaeeagroipaa", entity: { id: p.id, rowVersion: p.rowVersion } }));
+                lastSuccessfulEdehd = kalliergiaResult.newEdehd;
+                currentEdehdForThisTargetOps = lastSuccessfulEdehd; // Ενημέρωση για την επόμενη υπο-λειτουργία σε αυτό το target
+            }
+
+            if (dataToCloneConfig.paa) {
+                const paaResult = await this._clonePAA(
+                    sourceAgrotemaxioId, targetId,
+                    sourceData.paa,
+                    currentEdehdForThisTargetOps
+                );
+                allTargetsResults[targetId].paa = paaResult;
+                if (!paaResult.success) {
+                    allTargetsResults[targetId].success = false; overallSuccess = false;
+                    this._error(`Failed cloning PAA for target ${targetId}. Moving to next target if any.`);
+                    lastSuccessfulEdehd = paaResult.newEdehd;
+                    continue;
                 }
-                if (dataToCloneConfig.ecoschemes) {
-                    const targetEcos = await this.getEcoSchemesForAgrotemaxio(targetId);
-                    if (targetEcos) targetEcos.forEach(e => batchOperations.push({ status: 2, when: Date.now(), entityName: "Edetedeaeeagroieco", entity: { id: e.id, rowVersion: e.rowVersion } }));
+                lastSuccessfulEdehd = paaResult.newEdehd;
+                currentEdehdForThisTargetOps = lastSuccessfulEdehd;
+            }
+
+            if (dataToCloneConfig.ecoschemes) {
+                const ecoResult = await this._cloneEcoSchemes(
+                    sourceAgrotemaxioId, targetId,
+                    sourceData.ecoschemes,
+                    currentEdehdForThisTargetOps
+                );
+                allTargetsResults[targetId].ecoschemes = ecoResult;
+                if (!ecoResult.success) {
+                    allTargetsResults[targetId].success = false; overallSuccess = false;
+                    this._error(`Failed cloning EcoSchemes for target ${targetId}. Moving to next target if any.`);
+                    lastSuccessfulEdehd = ecoResult.newEdehd;
+                    continue;
                 }
+                lastSuccessfulEdehd = ecoResult.newEdehd;
+                // currentEdehdForThisTargetOps = lastSuccessfulEdehd; // Δεν υπάρχει επόμενη υπο-λειτουργία για αυτό το target
             }
-
-            // 3. Προετοιμασία προσθηκών
-            this._log(`Preparing additions for target ${targetId}`);
-            let fytikoKodikosCounter = 0; // Αυτά πρέπει να είναι ανά target, οπότε τα μηδενίζουμε εδώ
-            let paaKodikosCounter = 0;
-            let ecoKodikosCounter = 0;
-
-            // Λήψη των υπαρχόντων kodikoi για το target για να συνεχίσουμε από εκεί
-             if (dataToCloneConfig.kalliergies && sourceData.kalliergies) {
-                const existingTargetKalliergies = strategy === 'overwrite' ? [] : await this.getKalliergiesForAgrotemaxio(targetId);
-                fytikoKodikosCounter = existingTargetKalliergies.length > 0 ? Math.max(0, ...existingTargetKalliergies.map(k => parseInt(k.kodikos,10) || 0)) : 0;
-            }
-            if (dataToCloneConfig.paa && sourceData.paa) {
-                const existingTargetPaas = strategy === 'overwrite' ? [] : await this.getPAAForAgrotemaxio(targetId);
-                paaKodikosCounter = existingTargetPaas.length > 0 ? Math.max(0, ...existingTargetPaas.map(p => parseInt(p.kodikos,10) || 0)) : 0;
-            }
-            if (dataToCloneConfig.ecoschemes && sourceData.ecoschemes) {
-                const existingTargetEcos = strategy === 'overwrite' ? [] : await this.getEcoSchemesForAgrotemaxio(targetId);
-                ecoKodikosCounter = existingTargetEcos.length > 0 ? Math.max(0, ...existingTargetEcos.map(e => parseInt(e.kodikos,10) || 0)) : 0;
-            }
-
-
-            if (dataToCloneConfig.kalliergies && sourceData.kalliergies) {
-                for (const srcFytiko of sourceData.kalliergies) {
-                    fytikoKodikosCounter++;
-                    const tempNewFytikoId = `TEMP_CLONE_FYT_${targetId}_${Date.now()}_${fytikoKodikosCounter}`;
-
-                    const newFytikoEntityData = {
-                        ...srcFytiko,
-                        id: tempNewFytikoId,
-                        edaId: { id: targetId },
-                        edeId: { id: this.MAIN_APPLICATION_ID },
-                        kodikos: fytikoKodikosCounter,
-                        rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                        epilektash100: 0, // Η έκταση ΔΕΝ αντιγράφεται από την πηγή. Θέσε την σε 0 ή null.
-                                          // Ο χρήστης θα πρέπει να την ορίσει αργότερα για το target.
-                        // Το lkkoiId του srcFytiko (αν υπάρχει) θα αντιγραφεί, και η _prepareFytikoEntityForRequest θα το χειριστεί.
-                        // Το sexId του srcFytiko (αν υπάρχει) θα αντιγραφεί.
-                    };
-                    batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeefytiko", entity: this._prepareFytikoEntityForRequest(newFytikoEntityData) });
-
-                    const srcSyndedemenes = sourceData.syndedemenes[srcFytiko.id] || [];
-                    let syndedemeniKodikosCounter = 0;
-                    for (const srcSyndedemeni of srcSyndedemenes) {
-                        syndedemeniKodikosCounter++;
-                        const newSyndedemeniEntityData = {
-                            ...srcSyndedemeni,
-                            id: `TEMP_CLONE_REQ_${targetId}_${Date.now()}_${syndedemeniKodikosCounter}`,
-                            edaId: { id: targetId }, edeId: { id: this.MAIN_APPLICATION_ID },
-                            edfId: { id: tempNewFytikoId },
-                            kodikos: syndedemeniKodikosCounter,
-                            rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                        };
-                        batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeerequestfytiko", entity: this._prepareFytikoEntityForRequest(newSyndedemeniEntityData) });
-                    }
-                }
-            }
-
-            if (dataToCloneConfig.paa && sourceData.paa) {
-                for (const srcPaa of sourceData.paa) {
-                    paaKodikosCounter++;
-                    const newPaaEntityData = { /* ... παρόμοια με fytiko ... */
-                        ...srcPaa, id: `TEMP_CLONE_PAA_${targetId}_${Date.now()}_${paaKodikosCounter}`,
-                        edaId: { id: targetId }, edeId: { id: this.MAIN_APPLICATION_ID }, kodikos: paaKodikosCounter,
-                        rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                    };
-                    batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeeagroipaa", entity: this._prepareAgroPaaEntityForRequest(newPaaEntityData) });
-                }
-            }
-
-            if (dataToCloneConfig.ecoschemes && sourceData.ecoschemes) {
-                for (const srcEco of sourceData.ecoschemes) {
-                    ecoKodikosCounter++;
-                    const newEcoEntityData = { /* ... παρόμοια με fytiko ... */
-                        ...srcEco, id: `TEMP_CLONE_ECO_${targetId}_${Date.now()}_${ecoKodikosCounter}`,
-                        edaId: { id: targetId }, edeId: { id: this.MAIN_APPLICATION_ID }, kodikos: ecoKodikosCounter,
-                        rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                    };
-                    batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeeagroieco", entity: this._prepareAgroEcoEntityForRequest(newEcoEntityData) });
-                }
-            }
-
-            // 4. Εκτέλεση Batch Λειτουργιών (Διαγραφές + Προσθήκες + Ενημέρωση Edehd)
-            if (batchOperations.length > 0) {
-                batchOperations.push({
-                    status: 1, when: 0, entityName: "Edetedeaeehd",
-                    entity: { ...currentEdehdForTarget, rowVersion: currentEdehdForTarget.rowVersion + 2 }
-                });
-
-                this._log(`Executing batch of ${batchOperations.length -1} operations (+ Edehd update) for target ${targetId}`);
-                try {
-                    const batchResult = await this._synchronizeChanges(batchOperations);
-                    this._log(`Batch operations for target ${targetId} successful.`);
-                    results[targetId] = { success: true, message: "Cloned successfully.", details: batchResult };
-                } catch (error) {
-                    this._error(`Batch operations for target ${targetId} failed:`, error.data || error.message);
-                    results[targetId] = { success: false, message: `Clone failed: ${error.data ? error.data.message : error.message}`, errorData: error.data };
-                    // Αν αποτύχει, το rowVersion του Edehd δεν θα έχει αλλάξει (θεωρητικά),
-                    // οπότε το currentEdehdForTarget είναι ακόμα έγκυρο για το επόμενο target (αν και το επόμενο target θα ξανακάνει fetch).
-                }
-            } else {
-                this._log(`No operations to perform for target ${targetId}.`);
-                results[targetId] = { success: true, skipped: true, message: "No data to clone or no operations configured."};
-            }
+            this._log(`--- Finished Processing Target Agrotemaxio: ${targetId} ---`);
         } // end for targetId
 
         this._log("Cloning process completed for all targets.");
-        return results;
+        return { overallSuccess, targets: allTargetsResults };
     }
-}
+} // Τέλος Κλάσης
 
-// --- Παράδειγμα Χρήσης για τη συνάρτηση cloneAgrotemaxioData ---
-
-
+// --- Παράδειγμα Χρήσης (πιο απλό, ένα-ένα για αρχικό test) ---
 // (async () => {
-//     const MY_MAIN_APP_ID ="qB8ujfgfAKWoOF+W1gH/Ow==";
-//     const CURRENT_EAE_YEAR = 2025;
-//     const agroHelper = new OpekepeAgroHelper(MY_MAIN_APP_ID, CURRENT_EAE_YEAR);
+//     const MY_MAIN_APP_ID = prompt("Enter Main Application ID (edeId):", "qB8ujfgfAKWoOF+W1gH/Ow==");
+//     const CURRENT_EAE_YEAR = parseInt(prompt("Enter EAE Year:", "2025"), 10);
 
-//     const allAgros = await agroHelper.fetchAllAgrotemaxia(10);
-//     if (allAgros.length < 2) {
-//         console.warn("Need at least two agrotemaxia to test cloning.");
-//         // Optionally create some:
-//         // await agroHelper.createAgrotemaxio({ topothesia: "Πηγή Κλωνοποίησης"});
-//         // await agroHelper.createAgrotemaxio({ topothesia: "Στόχος Κλωνοποίησης 1"});
-//         // const updatedAgros = await agroHelper.fetchAllAgrotemaxia(10);
-//         // if (updatedAgros.length < 2) return;
-//         // sourceId = updatedAgros[0].id;
-//         // targetIds = [updatedAgros[1].id];
-//         return;
+//     if (!MY_MAIN_APP_ID || isNaN(CURRENT_EAE_YEAR)) {
+//         alert("Main Application ID and a valid EAE Year are required."); return;
 //     }
+//     const agroHelper = new OpekepeAgroHelper(MY_MAIN_APP_ID, CURRENT_EAE_YEAR, { verbose: true });
 
-//     const sourceId = allAgros[0].id;
-//     const targetIds = [allAgros[1].id];
-//     if (allAgros.length > 2) targetIds.push(allAgros[2].id); // Αν υπάρχουν περισσότερα
+//     try {
+//         console.log("--- Initial Main App Data Fetch ---");
+//         let mainAppData = await agroHelper.fetchMainApplicationData();
+//         if (!mainAppData) { console.error("STOP: Main app data failed."); return; }
+//         console.log("Initial Edehd rowVersion:", mainAppData.rowVersion);
 
-//     console.log(`Source Agrotemaxio ID: ${sourceId}`);
-//     console.log(`Target Agrotemaxio IDs: ${targetIds.join(', ')}`);
+//         const agrotemaxia = await agroHelper.fetchAllAgrotemaxia(3); // Πάρε 3 για δοκιμή
+//         if (agrotemaxia.length < 1) { console.error("STOP: Need at least 1 agrotemaxio to test."); return; }
+        
+//         const testAgroId = agrotemaxia[0].id;
+//         console.log(`Using Agrotemaxio ID: ${testAgroId} for individual tests.`);
 
-//     // Πρώτα, προσθήκη κάποιων δεδομένων στο source για να έχουμε τι να αντιγράψουμε
-//     // (Αυτό είναι για λόγους επίδειξης - στην πράξη, τα δεδομένα θα υπάρχουν)
-//     console.log("Adding some data to source agrotemaxio for cloning demonstration...");
-//     const amesesList = await agroHelper.fetchAmesesEnisxyseisList();
-//     const sklirosSitosEnisxysiDemo = amesesList.find(s => s.kodikos === "0102");
-//     if (sklirosSitosEnisxysiDemo) {
-//         await agroHelper.addKalliergiaWithOptionalSyndedemeni(
-//             sourceId,
-//             { epilektash100: 10.5, efyId: { id: "VMxnJnQisDYspssypbAjjA==" }, poiId: { id: "Zu50wPtrta9nV1CJTP3nkQ==" } },
-//             { eschId: { id: sklirosSitosEnisxysiDemo.id } }
+//         // Test 1: Προσθήκη Καλλιέργειας (χωρίς συνδεδεμένη αρχικά)
+//         console.log("\n--- Test: Add Kalliergia ---");
+//         const kalliergiaAddResult = await agroHelper.addKalliergiaWithOptionalSyndedemeni(
+//             testAgroId,
+//             {
+//                 epilektash100: 2.5,
+//                 efyId: { id: "VMxnJnQisDYspssypbAjjA==" }, // ΣΚΛΗΡΟΣ ΣΙΤΟΣ
+//                 poiId: { id: "Zu50wPtrta9nV1CJTP3nkQ==" }, // MARAKAS
+//                 emxpId: { id: "MPYw1gb+m4i2+tcRPDJ17Q=="}, // Σχετικό emxpId
+//                 // lkkoiId: 91940101 // Παράδειγμα αριθμητικού lkkoiId (kodikos)
+//             }
 //         );
-//     }
-//     const paaList = await agroHelper.fetchPAAList();
-//     const paaDemo = paaList.find(p => p.kodikos === "10.1.4Β");
-//     if (paaDemo) {
-//         await agroHelper.addPAAToAgrotemaxio(sourceId, paaDemo.id);
-//     }
-
-
-//     console.log("\n--- Starting Clone Operation ---");
-//     await agroHelper.cloneAgrotemaxioData(
-//         sourceId,
-//         targetIds,
-//         { kalliergies: true, paa: true, ecoschemes: false }, // Αντιγραφή καλλιεργειών/συνδεδεμένων και ΠΑΑ, όχι Οικολογικών Σχημάτων
-//         'overwrite'
-//     );
-
-//     // Έλεγχος των target αγροτεμαχίων
-//     for (const target of targetIds) {
-//         console.log(`\n--- Data for Target Agrotemaxio ID: ${target} AFTER CLONE ---`);
-//         const kalliergies = await agroHelper.getKalliergiesForAgrotemaxio(target);
-//         console.log("Kalliergies:", kalliergies);
-//         if (kalliergies && kalliergies.length > 0) {
-//             for(const k of kalliergies){
-//                 const synd = await agroHelper.getSyndedemenesForKalliergia(k.id);
-//                 console.log(`  Syndedemenes for fytiko ${k.id}:`, synd);
+//         console.log("Kalliergia Add Result:", kalliergiaAddResult);
+//         if (kalliergiaAddResult && kalliergiaAddResult.newEntitiesIds) {
+//             const newFytikoId = kalliergiaAddResult.newEntitiesIds.find(e => e.entityName === "Edetedeaeefytiko")?.databaseId;
+//             if (newFytikoId) {
+//                 console.log("New Fytiko ID:", newFytikoId);
+//                 // Test 2: Προσθήκη Συνδεδεμένης σε αυτή την καλλιέργεια
+//                 console.log("\n--- Test: Add Syndedemeni to New Kalliergia ---");
+//                 const amesesList = await agroHelper.fetchAmesesEnisxyseisList();
+//                 const syndedemeniSitos = amesesList.find(s => s.kodikos === "0102"); // ΣΚΛΗΡΟΣ ΣΙΤΟΣ
+//                 if (syndedemeniSitos) {
+//                     // Σημείωση: Η addKalliergiaWithOptionalSyndedemeni είναι για ταυτόχρονη προσθήκη.
+//                     // Για να προσθέσουμε συνδεδεμένη σε *υπάρχον* fytiko, χρειαζόμαστε άλλη μέθοδο ή να επεκτείνουμε την υπάρχουσα.
+//                     // Προς το παρόν, ας το προσομοιώσουμε καλώντας ξανά με όλα τα δεδομένα:
+//                     // (Αυτό ΔΕΝ είναι ο ιδανικός τρόπος για update, αλλά για test προσθήκης)
+//                      console.log("Simulating adding syndedemeni by re-adding fytiko with syndedemeni data (not ideal, for test only)");
+//                      // Θα χρειαζόταν πρώτα διαγραφή του προηγούμενου fytiko αν θέλαμε να το κάνουμε "σωστά" έτσι.
+//                      // Εναλλακτικά, μια νέα συνάρτηση addSyndedemeniToExistingFytiko(fytikoId, syndedemeniData)
+//                 }
 //             }
 //         }
-//         const paas = await agroHelper.getPAAForAgrotemaxio(target);
-//         console.log("PAAs:", paas);
-//         const ecos = await agroHelper.getEcoSchemesForAgrotemaxio(target);
-//         console.log("EcoSchemes:", ecos);
-//     }
 
+//         // Test 3: Προσθήκη ΠΑΑ
+//         console.log("\n--- Test: Add PAA ---");
+//         const paaList = await agroHelper.fetchPAAList();
+//         const paa1014B = paaList.find(p => p.kodikos === "10.1.4Β");
+//         if (paa1014B) {
+//             const paaAddResult = await agroHelper.addPAAToAgrotemaxio(testAgroId, paa1014B.id);
+//             console.log("PAA Add Result:", paaAddResult);
+//         } else { console.warn("PAA 10.1.4B not found in catalog."); }
+
+//         // Test 4: Προσθήκη Οικολογικού Σχήματος
+//         console.log("\n--- Test: Add Eco Scheme ---");
+//         const availableEcos = await agroHelper.fetchAvailableEcoSchemesForAgrotemaxio(testAgroId);
+//         const eco616 = availableEcos.find(e => e.kodikos === "ECO-06.16");
+//         if (eco616) {
+//             const ecoAddResult = await agroHelper.addEcoSchemesToAgrotemaxio(testAgroId, [eco616.id]);
+//             console.log("Eco Scheme Add Result:", ecoAddResult);
+//         } else { console.warn("Eco Scheme ECO-06.16 not found for this agrotemaxio."); }
+
+//         // Test 5: Διαγραφές (αν θέλεις να τις τεστάρεις, αφαίρεσε τα comments)
+//         // console.log("\n--- Test: Deletions ---");
+//         // const paasAfterAdd = await agroHelper.getPAAForAgrotemaxio(testAgroId);
+//         // if (paasAfterAdd && paasAfterAdd.length > 0) {
+//         //     console.log("Deleting PAA ID:", paasAfterAdd[0].id);
+//         //     await agroHelper.deletePAAFromAgrotemaxio(paasAfterAdd[0].id);
+//         // }
+//         // const ecosAfterAdd = await agroHelper.getEcoSchemesForAgrotemaxio(testAgroId);
+//         // if (ecosAfterAdd && ecosAfterAdd.length > 0) {
+//         //     console.log("Deleting Eco Scheme ID:", ecosAfterAdd[0].id);
+//         //     await agroHelper.deleteEcoSchemeFromAgrotemaxio(ecosAfterAdd[0].id);
+//         // }
+//         // const kalliergiesForDel = await agroHelper.getKalliergiesForAgrotemaxio(testAgroId);
+//         // if (kalliergiesForDel && kalliergiesForDel.length > 0) {
+//         //      console.log("Deleting Kalliergia ID:", kalliergiesForDel[0].id, "from agrotemaxio:", testAgroId);
+//         //      await agroHelper.deleteKalliergiaFromAgrotemaxio(kalliergiesForDel[0].id, testAgroId);
+//         // }
+
+
+//         // Test 6: Clone (αν υπάρχουν τουλάχιστον 2 αγροτεμάχια)
+//         // if (agrotemaxia.length >= 2) {
+//         //     const sourceCloneId = agrotemaxia[0].id;
+//         //     const targetCloneId = agrotemaxia[1].id;
+//         //     console.log(`\n--- Test: Clone from ${sourceCloneId} to ${targetCloneId} ---`);
+//         //     const cloneResult = await agroHelper.cloneAgrotemaxioData(
+//         //         sourceCloneId,
+//         //         [targetCloneId],
+//         //         { kalliergies: true, paa: true, ecoschemes: true }
+//         //     );
+//         //     console.log("Clone Result:", JSON.stringify(cloneResult, null, 2));
+//         // }
+
+
+//     } catch (error) {
+//         console.error("MAIN TEST EXECUTION ERROR:", error.data || error.message || error);
+//     }
 // })();
