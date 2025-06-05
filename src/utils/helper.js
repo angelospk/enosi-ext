@@ -143,36 +143,45 @@ class OpekepeAgroHelper {
 
 
     _prepareEdehdEntityForRequest(serverEdehdEntity) {
-        // ... (ίδιο με πριν) ...
         const dateFields = ['dteinsert', 'dteupdate', 'dtebirth', 'dteprotocol', 'dtestartekm', 'dteasfalish', 'dtedraststart', 'dteonlineproseas', 'dteOris'];
         const idFields = [
             { field: 'lkkoiIdB1', idKey: 'id'}, { field: 'doyId', idKey: 'id' }, { field: 'efoId', idKey: 'id' },
-            { field: 'lkpenIdA', idKey: 'id' }, { field: 'lkpenIdB1', idKey: 'id' }, { field: 'lkpenIdB2', idKey: 'id' },
-            { field: 'lkkoiIdB2', idKey: 'id' }, { field: 'daokKodikos', idKey: 'kodikos' }, { field: 'opdId', idKey: 'id' },
+            { field: 'lkpenIdA', idKey: 'id' }, // Το κρίσιμο πεδίο
+            { field: 'edeIdPrev', idKey: 'id' }, { field: 'edeIdNext', idKey: 'id' },
+            { field: 'lkpenIdB1', idKey: 'id' }, { field: 'lkpenIdB2', idKey: 'id' },
+            { field: 'lkkoiIdB2', idKey: 'id' },
+            { field: 'bnkId', idKey: 'id'}, { field: 'bnsId', idKey: 'id' },
+            { field: 'daokKodikos', idKey: 'kodikos' }, { field: 'opdId', idKey: 'id' },
             { field: 'ddsId', idKey: 'id' }, { field: 'ddrId', idKey: 'id' }, { field: 'lkprfId', idKey: 'id' },
-            { field: 'lkprfIdB2', idKey: 'id' }, { field: 'ownerSexId', idKey: 'id' }, { field: 'sexId', idKey: 'id' }
-            // Προσθήκη άλλων nested ID πεδίων αν υπάρχουν στο Edetedeaeehd
+            { field: 'mcoKodikos', idKey: 'id'}, // Υποθέτω ότι είναι ID, αν είναι kodikos άλλαξέ το
+            { field: 'orgId', idKey: 'id'},
+            { field: 'lkprfIdB2', idKey: 'id' },
+            { field: 'nmrId', idKey: 'id'}, { field: 'ownerSexId', idKey: 'id' }, { field: 'sexId', idKey: 'id' },
+            { field: 'depId', idKey: 'id'}, { field: 'edeIdPraxis', idKey: 'id' },
+            { field: 'esapId', idKey: 'id'}, { field: 'edskId', idKey: 'id' }
         ];
         return this._prepareEntityForRequest(serverEdehdEntity, dateFields, idFields);
     }
 
 
     _prepareAgrotemaxioEntityForRequest(serverEntity) {
-        // ... (ίδιο με πριν) ...
         const prepared = this._prepareEntityForRequest(serverEntity,
-                                                       ['dteinsert', 'dteupdate', 'dteensEpil', 'dteEnsPe', 'dteprotocolEda'],
-                                                       [{field: 'lkkoiId', idKey: 'id', wrapSimpleId: true}, {field: 'sexIdOther', idKey: 'id', wrapSimpleId: true}, {field: 'edelId', idKey: 'id', wrapSimpleId: true}]
+            ['dteinsert', 'dteupdate', 'dteensEpil', 'dteEnsPe', 'dteprotocolEda'],
+            [
+                {field: 'lkkoiId', idKey: 'id'},
+                {field: 'sexIdOther', idKey: 'id'}, // Αυτά μπορεί να μην είναι IDs αλλά flags, θέλει έλεγχο. Αν είναι απλά πεδία, αφαίρεσέ τα από εδώ.
+                {field: 'edelId', idKey: 'id'}
+            ]
         );
         if (prepared) {
             if (!prepared.edeId || (typeof prepared.edeId === 'object' && !prepared.edeId.id)) {
-                prepared.edeId = { id: this.MAIN_APPLICATION_ID };
+                 prepared.edeId = { id: this.MAIN_APPLICATION_ID };
             }
-            // Το sexId στο αγροτεμάχιο φαίνεται να είναι απλό ID, όχι αντικείμενο στο payload
-            if (typeof prepared.sexId === 'object' && prepared.sexId.id) {
+            // Το sexId στο αγροτεμάχιο φαίνεται να είναι απλό ID (αριθμός), όχι αντικείμενο στο payload
+            if (typeof prepared.sexId === 'object' && prepared.sexId && prepared.sexId.id !== undefined) {
                 prepared.sexId = prepared.sexId.id;
             } else if (prepared.sexId === null || prepared.sexId === undefined){
-                // Αν λείπει, ίσως θέλει ένα default, π.χ. 40005 που είδαμε
-                // prepared.sexId = 40005;
+                 // prepared.sexId = 40005; // Default αν χρειάζεται
             }
         }
         return prepared;
@@ -202,16 +211,39 @@ class OpekepeAgroHelper {
         return prepared;
     }
 
-    _prepareRequestFytikoEntityForRequest(serverEntity) {
-        return this._prepareEntityForRequest(serverEntity,
-                                             ['dteinsert', 'dteupdate'],
-                                             [
-                                                 {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
-                                             {field: 'edfId', idKey: 'id', required: true}, {field: 'efyId', idKey: 'id', required: true},
-                                             {field: 'poiId', idKey: 'id', required: true}, {field: 'eschId', idKey: 'id', required: true},
-                                             {field: 'sexId', idKey: 'id', required: true}, {field: 'edrqcId', idKey: 'id'}, {field: 'edrqeId', idKey: 'id'}
-                                             ]
+    _prepareFytikoEntityForRequest(serverEntity) {
+        const prepared = this._prepareEntityForRequest(serverEntity,
+            ['dteinsert', 'dteupdate', 'dteepisporhapo', 'dteepisporheos', 'dtedke'],
+            [
+                {field: 'edeId', idKey: 'id', required: true}, {field: 'edaId', idKey: 'id', required: true},
+                {field: 'efyId', idKey: 'id', required: true}, {field: 'poiId', idKey: 'id', required: true},
+                {field: 'emccId', idKey: 'id'}, {field: 'elmId', idKey: 'id'},
+                {field: 'efecId', idKey: 'id'}, {field: 'emxpId', idKey: 'id'},
+                {field: 'lkkoiId', idKey: 'id'} // Το lkkoiId του Fytiko
+            ]
         );
+        if (prepared) {
+            if (typeof prepared.sexId === 'object' && prepared.sexId && prepared.sexId.id !== undefined) {
+                prepared.sexId = prepared.sexId.id;
+            }
+            // Το lkkoiId στο Edetedeaeefytiko είναι αριθμός (kodikos) και όχι αντικείμενο ID στο payload.
+            // Οπότε η παραπάνω επεξεργασία για το lkkoiId μπορεί να μην είναι σωστή για το Fytiko.
+            // Αν το `serverEntity.lkkoiId` είναι ήδη αριθμός, η `_prepareEntityForRequest` θα το κάνει `{id: αριθμός}`.
+            // Ελέγχοντας το payload σου που απέτυχε: "lkkoiId": "uLfmi8KIYk0NJGPwiIrO7A==" (string)
+            // Στο payload που δούλεψε για το αγροτεμάχιο, το lkkoiId ήταν αντικείμενο.
+            // Στο Edetedeaeefytiko που πέτυχε, το lkkoiId ήταν αριθμός: "lkkoiId": 91940101
+            // Άρα, για το Fytiko, το lkkoiId πρέπει να είναι αριθμός, όχι αντικείμενο.
+            if (prepared.lkkoiId && typeof prepared.lkkoiId === 'object' && prepared.lkkoiId.id) {
+                 // Αυτό πιθανόν είναι λάθος για το Fytiko. Ας το αφήσουμε ως έχει από την πηγή, αν είναι αριθμός.
+                 // Αν η πηγή (π.χ. kalliergiaData.lkkoiId) είναι αριθμός, θα γίνει {id: αριθμός}.
+                 // Αν η kalliergiaData.lkkoiId είναι string ID, θα γίνει {id: stringID}.
+                 // Χρειαζόμαστε να είναι ΑΡΙΘΜΟΣ.
+                 // Για τώρα, θα το αφήσω όπως είναι και θα βασιστώ στα εισερχόμενα δεδομένα.
+                 // Αν το `kalliergiaData.lkkoiId` είναι string ID, τότε το αποτέλεσμα θα είναι `{id: "stringID"}`, που δεν είναι σωστό.
+                 // Καλύτερα να το χειριστούμε στην `addKalliergiaWithOptionalSyndedemeni`
+            }
+        }
+        return prepared;
     }
 
     _prepareAgroPaaEntityForRequest(serverEntity) {
@@ -302,9 +334,14 @@ class OpekepeAgroHelper {
 
     async _synchronizeChanges(dataPayloadArray) {
         const payload = { params: { data: dataPayloadArray } };
-        this._log("Synchronizing changes with payload items:", dataPayloadArray.map(d => ({name: d.entityName, status: d.status, id: d.entity.id }) ));
-        // Για λόγους ασφαλείας, μπορεί να μην θέλεις να κάνεις log ολόκληρο το payload αν περιέχει ευαίσθητα δεδομένα.
-        // console.log("Full sync payload (for debugging, can be large):", JSON.stringify(payload));
+        if (this.VERBOSE) {
+            this._log("Synchronizing changes with payload (showing entity names, statuses, and temp/db IDs):");
+            dataPayloadArray.forEach((item, index) => {
+                this._log(`Item ${index}: Name=${item.entityName}, Status=${item.status}, ID=${item.entity.id}`);
+            });
+            // Για πλήρες debugging του payload:
+            // this._log("Full payload to be sent:", JSON.stringify(payload, null, 2));
+        }
         return this._fetchApi('MainService/synchronizeChangesWithDb_Edetedeaeeagroi', 'POST', payload);
     }
 
@@ -565,17 +602,51 @@ class OpekepeAgroHelper {
     }
 
     async addKalliergiaWithOptionalSyndedemeni(agrotemaxioId, kalliergiaData, syndedemeniData = null) {
-        const currentEdehdData = await this.fetchMainApplicationData(); // Για το AFM κλπ.
-        if(!currentEdehdData) return null;
+        this._log(`Attempting to add kalliergia to agro ID: ${agrotemaxioId}`, {kalliergiaData, syndedemeniData});
+        const currentEdehdData = await this.fetchMainApplicationData();
+        if (!currentEdehdData) return null;
 
         const newEntitiesToAdd = [];
         const tempFytikoId = `TEMP_ID_FYTIKO_${Date.now()}`;
 
-        // Υπολογισμός επόμενου kodikos για Edetedeaeefytiko εντός του agrotemaxioId
         const existingKalliergies = await this.getKalliergiesForAgrotemaxio(agrotemaxioId);
         const nextFytikoKodikos = (existingKalliergies && existingKalliergies.length > 0)
-        ? Math.max(0, ...existingKalliergies.map(k => parseInt(k.kodikos, 10) || 0)) + 1
-        : 1;
+            ? Math.max(0, ...existingKalliergies.map(k => parseInt(k.kodikos, 10) || 0)) + 1
+            : 1;
+        this._log("Next fytiko kodikos will be:", nextFytikoKodikos);
+
+        // Προετοιμασία του lkkoiId για το Fytiko. Πρέπει να είναι αριθμός (kodikos)
+        let fytikoLkkoiId = null;
+        if (kalliergiaData.lkkoiId) { // Αν δίνεται
+            if (typeof kalliergiaData.lkkoiId === 'object' && kalliergiaData.lkkoiId.id) {
+                // Αν είναι αντικείμενο ID, προσπάθησε να βρεις τον kodiko από το αγροτεμάχιο (αν είναι ίδιο)
+                const agrotemaxioDetails = await this.findAgrotemaxioById(agrotemaxioId);
+                if (agrotemaxioDetails && agrotemaxioDetails.lkkoiId && agrotemaxioDetails.lkkoiId.id === kalliergiaData.lkkoiId.id && agrotemaxioDetails.lkkoiId.kodikos) {
+                    fytikoLkkoiId = parseInt(agrotemaxioDetails.lkkoiId.kodikos, 10);
+                } else {
+                     this._warn("lkkoiId for Fytiko was an object but couldn't resolve to a numeric kodikos. Setting to null.");
+                }
+            } else if (typeof kalliergiaData.lkkoiId === 'number') {
+                fytikoLkkoiId = kalliergiaData.lkkoiId;
+            } else if (typeof kalliergiaData.lkkoiId === 'string' && !isNaN(parseInt(kalliergiaData.lkkoiId, 10))) {
+                fytikoLkkoiId = parseInt(kalliergiaData.lkkoiId, 10);
+            } else {
+                 this._warn("lkkoiId for Fytiko has an unexpected format:", kalliergiaData.lkkoiId, ". Setting to null.");
+            }
+        } else { // Αν δεν δίνεται, πάρε το από το αγροτεμάχιο
+            const agrotemaxioDetails = await this.findAgrotemaxioById(agrotemaxioId);
+            if (agrotemaxioDetails && agrotemaxioDetails.lkkoiId && agrotemaxioDetails.lkkoiId.kodikos) {
+                 // Το lkkoiId του αγροτεμαχίου έρχεται ως αντικείμενο από το findAllByCriteriaRange, π.χ. { $entityName: ..., id: ..., kodikos: ... }
+                 // Αλλά το findAgrotemaxioById το προετοιμάζει σε {id: '...'}
+                 // Χρειαζόμαστε τον KODIKO του lkkoiId του αγροτεμαχίου.
+                 // Ας ξαναφέρουμε το raw αγροτεμάχιο για αυτό.
+                const rawAgroDetails = (await this.fetchAllAgrotemaxia()).find(a => a.id === agrotemaxioId);
+                if (rawAgroDetails && rawAgroDetails.lkkoiId && rawAgroDetails.lkkoiId.kodikos) {
+                    fytikoLkkoiId = parseInt(rawAgroDetails.lkkoiId.kodikos, 10);
+                }
+            }
+        }
+        if (isNaN(fytikoLkkoiId)) fytikoLkkoiId = null; // Βεβαιώσου ότι είναι αριθμός ή null
 
         const fytikoEntityBase = {
             id: tempFytikoId,
@@ -588,46 +659,42 @@ class OpekepeAgroHelper {
             etos: this.EAE_YEAR,
             edeId: { id: this.MAIN_APPLICATION_ID },
             edaId: { id: agrotemaxioId },
-            efyId: kalliergiaData.efyId, // πρέπει να είναι {id: '...'}
-            poiId: kalliergiaData.poiId, // πρέπει να είναι {id: '...'}
-            epilektash100: kalliergiaData.epilektash100 || 0,
-            // ... άλλα απαραίτητα πεδία από kalliergiaData ή defaults ...
-            sexId: kalliergiaData.sexId || currentEdehdData.sexId?.id || 40005, //Προσοχή εδώ
-            lkkoiId: kalliergiaData.lkkoiId || (await this.findAgrotemaxioById(agrotemaxioId))?.lkkoiId?.id,
+            efyId: kalliergiaData.efyId,
+            poiId: kalliergiaData.poiId,
+            emxpId: kalliergiaData.emxpId, // Προσθήκη αυτού
+            epilektash100: parseFloat(kalliergiaData.epilektash100) || 0,
+            sexId: kalliergiaData.sexId !== undefined ? kalliergiaData.sexId : (currentEdehdData.sexId?.id ? parseInt(currentEdehdData.sexId.id,10) : 40005),
+            lkkoiId: fytikoLkkoiId, // Πρέπει να είναι αριθμός
+            // Αφαίρεση των dteinsert, dteupdate, dteepisporhapo, dteepisporheos, αυτά θα τα βάλει ο server ή θα μείνουν null
         };
+        // Κάνουμε merge με τα υπόλοιπα kalliergiaData, προσέχοντας να μην αντικαταστήσουμε τα βασικά που ορίσαμε
+        const finalFytikoEntityData = {...kalliergiaData, ...fytikoEntityBase };
         newEntitiesToAdd.push({
             entityName: "Edetedeaeefytiko",
-            entityData: this._prepareFytikoEntityForRequest({...fytikoEntityBase, ...kalliergiaData})
+            entityData: this._prepareFytikoEntityForRequest(finalFytikoEntityData)
         });
 
         if (syndedemeniData && syndedemeniData.eschId) {
-            // Υπολογισμός επόμενου kodikos για Edetedeaeerequestfytiko εντός του fytikoId
-            // (Αν και συνήθως υπάρχει μόνο ένα request ανά fytiko για μια συγκεκριμένη ενίσχυση)
-            const nextRequestKodikos = 1; // Ας υποθέσουμε 1 για αρχή, θέλει έλεγχο αν μπορεί να έχει πολλαπλά
-
+            // ... (παρόμοια λογική για το requestFytikoEntity, βεβαιώσου ότι τα IDs είναι σωστά)
+            const nextRequestKodikos = 1;
             const requestFytikoBase = {
                 id: `TEMP_ID_REQFYTIKO_${Date.now()}`,
-                afm: currentEdehdData.afm,
-                recordtype: 0,
-                kodikos: nextRequestKodikos,
-                eschLt2: syndedemeniData.eschLt2 || 2,
-                rowVersion: null,
-                etos: this.EAE_YEAR,
-                edeId: { id: this.MAIN_APPLICATION_ID },
-                edaId: { id: agrotemaxioId },
-                edfId: { id: tempFytikoId },
-                efyId: kalliergiaData.efyId, // Από την καλλιέργεια
-                poiId: kalliergiaData.poiId, // Από την καλλιέργεια
-                eschId: syndedemeniData.eschId, // πρέπει να είναι {id: '...'}
+                afm: currentEdehdData.afm, recordtype: 0, kodikos: nextRequestKodikos,
+                eschLt2: syndedemeniData.eschLt2 || 2, rowVersion: null, etos: this.EAE_YEAR,
+                edeId: { id: this.MAIN_APPLICATION_ID }, edaId: { id: agrotemaxioId },
+                edfId: { id: tempFytikoId }, efyId: finalFytikoEntityData.efyId,
+                poiId: finalFytikoEntityData.poiId, eschId: syndedemeniData.eschId,
                 sexId: {id: currentEdehdData.sexId?.id || "99gZmMPS9BTTkHuUFInwyw=="},
             };
+            const finalRequestFytikoData = {...syndedemeniData, ...requestFytikoBase};
             newEntitiesToAdd.push({
                 entityName: "Edetedeaeerequestfytiko",
-                entityData: this._prepareRequestFytikoEntityForRequest({...requestFytikoBase, ...syndedemeniData})
+                entityData: this._prepareFytikoEntityForRequest(finalRequestFytikoData)
             });
         }
         return this._addRelatedEntities(newEntitiesToAdd);
     }
+
 
     async deleteKalliergiaFromAgrotemaxio(kalliergiaId, agrotemaxioIdForContext) { // Χρειαζόμαστε το agrotemaxioId για να βρούμε το fytiko
         this._log(`Attempting to delete kalliergia ID: ${kalliergiaId} (and its syndedemenes) from agrotemaxio ID: ${agrotemaxioIdForContext}`);
@@ -886,8 +953,10 @@ class OpekepeAgroHelper {
                         edeId: { id: this.MAIN_APPLICATION_ID },
                         kodikos: fytikoKodikosCounter,
                         rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                        epilektash100: srcFytiko.epilektash100 || 0, // Αντιγραφή έκτασης πηγής, ή 0/null.
-                                                                     // Εναλλακτικά, μπορεί να οριστεί πάντα σε 0/null εδώ.
+                        epilektash100: 0, // Η έκταση ΔΕΝ αντιγράφεται από την πηγή. Θέσε την σε 0 ή null.
+                                          // Ο χρήστης θα πρέπει να την ορίσει αργότερα για το target.
+                        // Το lkkoiId του srcFytiko (αν υπάρχει) θα αντιγραφεί, και η _prepareFytikoEntityForRequest θα το χειριστεί.
+                        // Το sexId του srcFytiko (αν υπάρχει) θα αντιγραφεί.
                     };
                     batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeefytiko", entity: this._prepareFytikoEntityForRequest(newFytikoEntityData) });
 
@@ -903,7 +972,7 @@ class OpekepeAgroHelper {
                             kodikos: syndedemeniKodikosCounter,
                             rowVersion: null, usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
                         };
-                        batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeerequestfytiko", entity: this._prepareRequestFytikoEntityForRequest(newSyndedemeniEntityData) });
+                        batchOperations.push({ status: 0, when: Date.now(), entityName: "Edetedeaeerequestfytiko", entity: this._prepareFytikoEntityForRequest(newSyndedemeniEntityData) });
                     }
                 }
             }
