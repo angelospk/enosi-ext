@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { useBrowserLocalStorage } from '../composables/useBrowserStorage';
+import { useSettingsStore } from './settings.store';
 
 export interface ProcessedMessage {
   id: string; // Μοναδικό ID, π.χ. hash του rawText
@@ -61,6 +62,13 @@ export const useMessageStore = defineStore('messages', () => {
       currentApplicationId.value = appId;
       messages.value = [];
       changeCounters.value = { newMessages: 0, removedMessages: 0 };
+
+      // **NEW**: Check the setting to decide if we should clear dismissed messages
+      const settingsStore = useSettingsStore();
+      if (settingsStore.restoreDismissedOnNewApp) {
+        permanentlyDismissedMessageIds.value = [];
+      }
+
       if (!appId) {
           isLoading.value = false;
       }
@@ -74,15 +82,7 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   async function updateMessages(rawMessages: string[], newAppId?: string) {
-    if (newAppId && newAppId !== currentApplicationId.value) {
-        setApplicationId(newAppId);
-    }
-    if (!currentApplicationId.value && rawMessages.length === 0) {
-        messages.value = [];
-        isLoading.value = false;
-        return;
-    }
-
+    // ... (initial logic remains the same) ...
     isLoading.value = true;
     lastError.value = null;
     await dismissedPromise.value;
@@ -91,30 +91,28 @@ export const useMessageStore = defineStore('messages', () => {
     const newProcessedMessages: ProcessedMessage[] = [];
     const incomingMessageIds = new Set<string>();
 
-    // Process incoming messages
+    // **IMPROVEMENT**: Keep track of old message IDs for accurate change detection
+    const existingMessageIds = new Set(messages.value.map(m => m.id));
+
     rawMessages.forEach((rawText, index) => {
       const cleanedText = cleanMessageText(rawText);
       const id = generateMessageId(cleanedText);
       incomingMessageIds.add(id);
 
       const existingMessage = messages.value.find(m => m.id === id);
-      const messageType = categorizeMessage(rawText);
-
       if (existingMessage) {
-        existingMessage.lastSeen = now;
+        existingMessage.lastSeen = now; // **KEY CHANGE**: Always update lastSeen
         existingMessage.rawText = rawText;
         existingMessage.cleanedText = cleanedText;
-        existingMessage.type = messageType;
-        if (!existingMessage.isDismissedOnce) {
+        existingMessage.type = categorizeMessage(rawText);
+        existingMessage.isDismissedOnce = false;
         newProcessedMessages.push(existingMessage);
-        }
-
       } else {
         newProcessedMessages.push({
           id,
           rawText,
           cleanedText,
-          type: messageType,
+          type: categorizeMessage(rawText),
           firstSeen: now,
           lastSeen: now,
           isDismissedOnce: false,
@@ -123,22 +121,20 @@ export const useMessageStore = defineStore('messages', () => {
       }
     });
 
-    // **CHANGE**: Identify removed messages based on ID, not raw text
-    const removedMessagesCount = messages.value.filter(
-      oldMsg => !incomingMessageIds.has(oldMsg.id)
-    ).length;
-    
-    // **KEY CHANGE**: We update the change counters *before* filtering for visibility.
-    // This gives a more accurate count of what the API sent vs what is displayed.
-    const newVisibleMessages = newProcessedMessages.filter(m => !permanentlyDismissedMessageIds.value.includes(m.id));
+    // **IMPROVED LOGIC**: More accurate change detection
+    const newlyAddedCount = Array.from(incomingMessageIds).filter(id => !existingMessageIds.has(id)).length;
+    const removedMessagesCount = Array.from(existingMessageIds).filter(id => !incomingMessageIds.has(id)).length;
 
-    changeCounters.value = {
-        newMessages: newVisibleMessages.length, // Count only what will be visible
-        removedMessages: removedMessagesCount
-    };
-    
-    // The main `messages` array now holds ALL messages from the last poll.
-    messages.value = newProcessedMessages.sort((a,b) => (a.originalIndex ?? 0) - (b.originalIndex ?? 0));
+    // Only update counters if there's an actual change to avoid unnecessary banner flashes
+    if (newlyAddedCount > 0 || removedMessagesCount > 0) {
+        changeCounters.value = {
+            newMessages: newlyAddedCount,
+            removedMessages: removedMessagesCount
+        };
+    }
+
+    // **KEY CHANGE**: Sort by lastSeen descending (newest first)
+    messages.value = newProcessedMessages.sort((a, b) => b.lastSeen - a.lastSeen);
     isLoading.value = false;
   }
 

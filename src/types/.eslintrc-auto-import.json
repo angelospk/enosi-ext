@@ -310,6 +310,7 @@
     "useScroll": true,
     "useScrollLock": true,
     "useSessionStorage": true,
+    "useSettingsStore": true,
     "useShare": true,
     "useSlots": true,
     "useSorted": true,

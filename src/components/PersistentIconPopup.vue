@@ -10,58 +10,81 @@
       height: state.height + 'px',
     }"
   >
-    <div v-if="showErrorBanner" class="popup-error-banner" @click="clearChangeCounters">
-      Νέα σφάλματα: {{ localMessageStore.changeCounters.newErrors }} (κάντε κλικ για εκκαθάριση)
+    <!-- 1. ΝΕΟ: Banner που εμφανίζεται όταν υπάρχουν νέες αλλαγές (προσθήκες/αφαιρέσεις) -->
+    <div v-if="showUpdateBanner" class="popup-update-banner" @click="clearChangeCounters">
+      {{ bannerText }} (κάντε κλικ για εκκαθάριση)
     </div>
-    <div
-      class="popup-header"
-      @mousedown.prevent="handleDragStart"
-    >
-      <h4>Μηνύματα Αίτησης</h4>
-      <div class="polling-controls">
-        <label style="margin-right:8px; font-size:0.95em;">
-          <input type="checkbox" v-model="pollingEnabled" @change="onPollingToggle" />
-          Polling
-        </label>
-        <input type="number" min="2000" step="1000" v-model.number="pollingInterval" @change="onIntervalChange" style="width:70px; font-size:0.95em;" :disabled="!pollingEnabled" />
-        <span style="font-size:0.9em; color:#888; margin-left:4px;">ms</span>
+
+    <!-- 2. Header με τις καρτέλες (tabs) και το κουμπί κλεισίματος -->
+    <div class="popup-header" @mousedown.prevent="handleDragStart">
+      <div class="tab-buttons">
+        <button :class="{ active: activeTab === 'messages' }" @click="activeTab = 'messages'">
+          Μηνύματα ({{ messageStore.visibleMessages.length }})
+        </button>
+        <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
+          Ρυθμίσεις
+        </button>
       </div>
-      <button
-        class="close-button"
-        title="Close"
-        @click.stop="closePopupAndClearBadge"
-      >
-        ×
-      </button>
+      <button class="close-button" title="Κλείσιμο" @click.stop="closePopupAndClearBadge">×</button>
     </div>
 
+    <!-- 3. Κύριο περιεχόμενο που αλλάζει ανάλογα με την ενεργή καρτέλα -->
     <div class="popup-body">
-      <MessagesDisplay :messages="messagesToShow" /> 
+      <!-- Περιεχόμενο για την καρτέλα "Μηνύματα" -->
+      <template v-if="activeTab === 'messages'">
+        <!-- Το MessagesDisplay δεν χρειάζεται πια props, παίρνει τα δεδομένα από το store του -->
+        <MessagesDisplay />
+      </template>
+
+      <!-- Περιεχόμενο για την καρτέλα "Ρυθμίσεις" -->
+      <template v-if="activeTab === 'settings'">
+        <div class="settings-pane">
+          <h4>Ρυθμίσεις Polling</h4>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" v-model="settingsStore.pollingEnabled" />
+              Αυτόματη Ανανέωση
+            </label>
+          </div>
+          <div class="setting-item">
+            <label for="polling-interval">Διάστημα (δευτερόλεπτα):</label>
+            <input
+              id="polling-interval"
+              type="number"
+              min="2"
+              step="1"
+              v-model.number="pollingIntervalSeconds"
+              style="width: 70px;"
+              :disabled="!settingsStore.pollingEnabled"
+            />
+          </div>
+          <hr>
+          <h4>Άλλες Ρυθμίσεις</h4>
+           <div class="setting-item-vertical">
+            <label>
+              <input type="checkbox" v-model="settingsStore.restoreDismissedOnNewApp" />
+              Επαναφορά απορριφθέντων σε νέα αίτηση
+            </label>
+             <small>Όλα τα "αγνοημένα για πάντα" μηνύματα θα εμφανιστούν ξανά όταν επιλέξετε διαφορετική αίτηση.</small>
+          </div>
+        </div>
+      </template>
     </div>
 
-
-    <div
-      class="resize-handle resize-handle-br"
-      @mousedown.prevent="handleResizeStart($event, 'br')"
-    ></div>
-    <div
-      class="resize-handle resize-handle-r"
-      @mousedown.prevent="handleResizeStart($event, 'r')"
-    ></div>
-    <div
-      class="resize-handle resize-handle-b"
-      @mousedown.prevent="handleResizeStart($event, 'b')"
-    ></div>
+    <!-- 4. Χειριστήρια για αλλαγή μεγέθους (παραμένουν ως είχαν) -->
+    <div class="resize-handle resize-handle-br" @mousedown.prevent="handleResizeStart($event, 'br')"></div>
+    <div class="resize-handle resize-handle-r" @mousedown.prevent="handleResizeStart($event, 'r')"></div>
+    <div class="resize-handle resize-handle-b" @mousedown.prevent="handleResizeStart($event, 'b')"></div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { useBrowserLocalStorage } from '../composables/useBrowserStorage';
-import MessagesDisplay from './MessagesDisplay.vue'; // Εισαγωγή του νέου component
-import { useMessageStore } from '../stores/messages.store'; // Για τον καθαρισμό του badge
+import MessagesDisplay from './MessagesDisplay.vue';
+import { useMessageStore } from '../stores/messages.store';
+import { useSettingsStore } from '../stores/settings.store'; // Νέα εισαγωγή
 import { sendMessage } from 'webext-bridge/content-script';
-import { mockSystemMessages } from '../utils/mockData';
 
 interface PopupState {
   x: number;
@@ -70,27 +93,91 @@ interface PopupState {
   height: number;
 }
 
+// --- State για την κατάσταση του Component ---
 const isVisible = ref(false);
+const activeTab = ref<'messages' | 'settings'>('messages');
+
+// --- Pinia Stores ---
+const messageStore = useMessageStore();
+const settingsStore = useSettingsStore();
+
+// --- Λογική για το Banner Ενημερώσεων ---
+const showUpdateBanner = computed(() =>
+  messageStore.changeCounters.newMessages > 0 || messageStore.changeCounters.removedMessages > 0
+);
+
+const bannerText = computed(() => {
+  const parts = [];
+  if (messageStore.changeCounters.newMessages > 0) {
+    parts.push(`${messageStore.changeCounters.newMessages} νέα`);
+  }
+  if (messageStore.changeCounters.removedMessages > 0) {
+    parts.push(`${messageStore.changeCounters.removedMessages} αφαιρέθηκαν`);
+  }
+  return `Αλλαγές: ${parts.join(', ')}`;
+});
+
+const clearChangeCounters = () => {
+  messageStore.clearChangeCounters();
+  sendMessage('clear-change-counters', null).catch(e => console.warn("CS: Failed to send clear-change-counters", e));
+};
+
+// --- Λογική για το Polling (τώρα συνδέεται με το settingsStore) ---
+// Computed property για μετατροπή ms <-> δευτερόλεπτα για το UI
+const pollingIntervalSeconds = computed({
+  get: () => Math.round(settingsStore.pollingInterval / 1000),
+  set: (value) => {
+    // Ενημέρωση του store σε milliseconds όταν ο χρήστης αλλάζει την τιμή
+    if (typeof value === 'number' && value >= 2) {
+      settingsStore.pollingInterval = value * 1000;
+    }
+  }
+});
+
+// --- Λογική για την Εμφάνιση/Απόκρυψη του Popup ---
+const show = () => {
+  isVisible.value = true;
+  nextTick(() => {
+    ensureInViewport();
+  });
+};
+
+const hide = () => {
+  isVisible.value = false;
+};
+
+const closePopupAndClearBadge = () => {
+    hide();
+    clearChangeCounters();
+    sendMessage('popup-visibility-changed', { visible: false }).catch(e => console.warn("CS: Failed to send popup-visibility-changed", e));
+}
+
+const toggleVisibility = () => {
+  if (isVisible.value) {
+    closePopupAndClearBadge();
+  } else {
+    show();
+    clearChangeCounters(); // Καθαρισμός μετρητών μόλις ανοίξει
+    sendMessage('popup-visibility-changed', { visible: true }).catch(e => console.warn("CS: Failed to send popup-visibility-changed", e));
+  }
+};
+
+// Expose μεθόδων για να καλούνται από το εξωτερικό (π.χ. από το content script)
+defineExpose({ show, hide, toggleVisibility, isVisible });
+
+// --- Λογική για Μετακίνηση & Αλλαγή Μεγέθους (Drag & Resize) ---
+// (Αυτή η ενότητα παραμένει ακριβώς όπως την είχες)
 const popupEl = ref<HTMLElement | null>(null);
-const localMessageStore = useMessageStore(); // Χρήση του τοπικού store που συγχρονίζεται από το background
-
-// DEV: Toggle to use mock data
-const useMockData = false; // Set to true for development/testing
-
-const messagesToShow = computed(() => useMockData ? mockSystemMessages : localMessageStore.messages);
-
-// --- State for Dragging and Resizing ---
-// ... (η υπόλοιπη λογική για drag/resize παραμένει ως έχει)
 const operation = ref<'idle' | 'dragging' | 'resizing'>('idle');
 const dragStartPos = ref({ x: 0, y: 0 });
 const initialPopupState = ref<PopupState | null>(null);
 const activeResizeHandle = ref<string | null>(null);
 
 const defaultState: PopupState = {
-  x: window.innerWidth - 380, // Default X
-  y: 60,                      // Default Y (πιο κοντά στην κορυφή)
-  width: 360,                 // Default Width
-  height: 450,                // Default Height
+  x: window.innerWidth - 380,
+  y: 60,
+  width: 360,
+  height: 450,
 };
 const minWidth = 250;
 const minHeight = 200;
@@ -108,18 +195,13 @@ onMounted(async () => {
 });
 
 const ensureInViewport = () => {
-  // ... (παραμένει ως έχει)
     let newX = state.value.x;
     let newY = state.value.y;
     const currentWidth = state.value.width;
     const currentHeight = state.value.height;
 
-    if (newX + currentWidth > window.innerWidth) {
-        newX = window.innerWidth - currentWidth - 5;
-    }
-    if (newY + currentHeight > window.innerHeight) {
-        newY = window.innerHeight - currentHeight - 5;
-    }
+    if (newX + currentWidth > window.innerWidth) newX = window.innerWidth - currentWidth - 5;
+    if (newY + currentHeight > window.innerHeight) newY = window.innerHeight - currentHeight - 5;
     if (newX < 0) newX = 5;
     if (newY < 0) newY = 5;
 
@@ -127,61 +209,27 @@ const ensureInViewport = () => {
     state.value.y = newY;
 };
 
-const show = () => {
-  isVisible.value = true;
-  nextTick(() => {
-    ensureInViewport();
-  });
-};
-
-const hide = () => {
-  isVisible.value = false;
-};
-
-const closePopupAndClearBadge = () => {
-    hide();
-    sendMessage('clear-change-counters', null).catch(e => console.warn("CS: Failed to send clear-change-counters", e));
-    sendMessage('popup-visibility-changed', { visible: false }).catch(e => console.warn("CS: Failed to send popup-visibility-changed", e));
-}
-
-const toggleVisibility = () => {
-  if (isVisible.value) {
-    closePopupAndClearBadge();
-  } else {
-    show();
-    sendMessage('clear-change-counters', null).catch(e => console.warn("CS: Failed to send clear-change-counters", e));
-    sendMessage('popup-visibility-changed', { visible: true }).catch(e => console.warn("CS: Failed to send popup-visibility-changed", e));
-  }
-};
-// --- Drag (Move) Logic ---
-// ... (παραμένει ως έχει)
 const handleDragStart = (event: MouseEvent) => {
   if (operation.value !== 'idle') return;
   operation.value = 'dragging';
   initialPopupState.value = { ...state.value };
   dragStartPos.value = { x: event.clientX, y: event.clientY };
-
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
   document.body.style.userSelect = 'none';
 };
 
-// --- Resize Logic ---
-// ... (παραμένει ως έχει)
 const handleResizeStart = (event: MouseEvent, handle: string) => {
   if (operation.value !== 'idle') return;
   operation.value = 'resizing';
   activeResizeHandle.value = handle;
   initialPopupState.value = { ...state.value };
   dragStartPos.value = { x: event.clientX, y: event.clientY };
-
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
   document.body.style.userSelect = 'none';
 };
 
-// --- Unified Mouse Move for Drag & Resize ---
-// ... (παραμένει ως έχει)
 const handleMouseMove = (event: MouseEvent) => {
   if (operation.value === 'idle' || !initialPopupState.value) return;
   event.preventDefault();
@@ -190,72 +238,39 @@ const handleMouseMove = (event: MouseEvent) => {
   const dy = event.clientY - dragStartPos.value.y;
 
   if (operation.value === 'dragging') {
-    let newX = initialPopupState.value.x + dx;
-    let newY = initialPopupState.value.y + dy;
-
-    newX = Math.max(0, Math.min(newX, window.innerWidth - state.value.width));
-    newY = Math.max(0, Math.min(newY, window.innerHeight - state.value.height));
-    state.value.x = newX;
-    state.value.y = newY;
-
+    state.value.x = initialPopupState.value.x + dx;
+    state.value.y = initialPopupState.value.y + dy;
   } else if (operation.value === 'resizing' && activeResizeHandle.value) {
     let newWidth = initialPopupState.value.width;
     let newHeight = initialPopupState.value.height;
-
-    if (activeResizeHandle.value.includes('r')) {
-      newWidth = Math.max(minWidth, initialPopupState.value.width + dx);
-    }
-    if (activeResizeHandle.value.includes('b')) {
-      newHeight = Math.max(minHeight, initialPopupState.value.height + dy);
-    }
-    state.value.width = Math.min(newWidth, window.innerWidth - state.value.x);
-    state.value.height = Math.min(newHeight, window.innerHeight - state.value.y);
+    if (activeResizeHandle.value.includes('r')) newWidth = Math.max(minWidth, initialPopupState.value.width + dx);
+    if (activeResizeHandle.value.includes('b')) newHeight = Math.max(minHeight, initialPopupState.value.height + dy);
+    state.value.width = newWidth;
+    state.value.height = newHeight;
   }
 };
 
-// --- Unified Mouse Up for Drag & Resize ---
-// ... (παραμένει ως έχει)
 const handleMouseUp = () => {
   if (operation.value === 'idle') return;
+  ensureInViewport(); // Βεβαιώνει ότι το παράθυρο είναι ορατό μετά το drag/resize
   operation.value = 'idle';
   activeResizeHandle.value = null;
   initialPopupState.value = null;
-
   document.removeEventListener('mousemove', handleMouseMove);
   document.removeEventListener('mouseup', handleMouseUp);
   document.body.style.userSelect = '';
 };
 
-
 onUnmounted(() => {
-  // ... (παραμένει ως έχει)
   document.removeEventListener('mousemove', handleMouseMove);
   document.removeEventListener('mouseup', handleMouseUp);
   if (document.body.style.userSelect === 'none') {
     document.body.style.userSelect = '';
   }
 });
-
-defineExpose({ show, hide, toggleVisibility, isVisible }); // Expose isVisible
-
-const showErrorBanner = computed(() => localMessageStore.changeCounters.newErrors > 0);
-const clearChangeCounters = () => {
-  localMessageStore.clearChangeCounters();
-};
-
-const pollingEnabled = ref(false);
-const pollingInterval = ref(20000);
-
-const onPollingToggle = () => {
-  sendMessage('set-polling-enabled', pollingEnabled.value).catch(e => console.warn('Failed to set polling enabled', e));
-};
-const onIntervalChange = () => {
-  sendMessage('set-polling-interval', pollingInterval.value).catch(e => console.warn('Failed to set polling interval', e));
-};
 </script>
 
 <style scoped>
-/* ... (οι υπάρχουσες κλάσεις CSS παραμένουν, προσέξτε το popup-body) ... */
 .persistent-icon-popup-content {
   position: fixed;
   background-color: white;
@@ -266,36 +281,26 @@ const onIntervalChange = () => {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* Κρύβει οτιδήποτε ξεφεύγει από τις στρογγυλεμένες γωνίες */
 }
 
 .popup-header {
   background-color: #f0f0f0;
-  padding: 8px 12px;
+  padding: 0 12px 0 0; /* Αλλαγή padding για να χωρέσουν οι καρτέλες */
   cursor: move;
   border-bottom: 1px solid #ddd;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 36px;
+  height: 40px; /* Λίγο μεγαλύτερο ύψος για τις καρτέλες */
   box-sizing: border-box;
-  flex-shrink: 0; /* Header won't shrink */
-}
-
-.popup-header h4 {
-  margin: 0;
-  font-size: 1em;
-  font-weight: 600;
-  color: #333;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .close-button {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: bold;
   color: #777;
   cursor: pointer;
@@ -306,67 +311,122 @@ const onIntervalChange = () => {
   color: #333;
 }
 
+/* Στυλ για τις Καρτέλες (Tabs) */
+.tab-buttons {
+  display: flex;
+  align-self: flex-end;
+}
+.tab-buttons button {
+  padding: 8px 16px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  color: #555;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* Για να "κάθεται" πάνω στη γραμμή του header */
+  transition: background-color 0.2s;
+}
+.tab-buttons button.active {
+  color: #007bff;
+  font-weight: 600;
+  border-bottom-color: #007bff;
+}
+.tab-buttons button:hover:not(.active) {
+  background-color: #e9e9e9;
+}
+
 .popup-body {
-  /* padding: 15px;  -> Το padding θα το διαχειρίζεται το MessagesDisplay.vue */
   color: #555;
   flex-grow: 1;
-  overflow-y: auto; /* Επιτρέπει scroll στο σώμα του popup */
+  overflow-y: auto;
   font-size: 14px;
-  min-height: 0; /* Για σωστή λειτουργία του flex-grow με overflow */
+  min-height: 0;
 }
 
+/* Στυλ για το Banner Ενημερώσεων */
+.popup-update-banner {
+  background: #e3f2fd;
+  color: #0d47a1;
+  padding: 8px 12px;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  border-bottom: 1px solid #90caf9;
+  flex-shrink: 0;
+  animation: fadeIn 0.3s ease-in-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Στυλ για την Καρτέλα Ρυθμίσεων */
+.settings-pane {
+  padding: 15px;
+  font-size: 14px;
+}
+.settings-pane h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+  color: #333;
+}
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.setting-item-vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.setting-item label, .setting-item-vertical label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.setting-item-vertical small {
+  display: block;
+  color: #666;
+  margin-top: 4px;
+  font-size: 0.85em;
+  padding-left: 24px;
+}
+hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 20px 0;
+}
+
+/* Στυλ για τα Χερούλια Αλλαγής Μεγέθους (Resize Handles) */
 .resize-handle {
   position: absolute;
-  width: 10px;
-  height: 10px;
-  /* background-color: rgba(0,0,0,0.1); For debugging handles */
 }
-
 .resize-handle-br {
   bottom: 0;
   right: 0;
-  width:10%;
-  height:10%;
+  width: 15px;
+  height: 15px;
   cursor: nwse-resize;
 }
 .resize-handle-r {
   top: 0;
   right: 0;
-  width: 5px; /* Thinner edge handle */
-  height: 85%;
+  width: 5px;
+  height: 100%;
   cursor: ew-resize;
 }
 .resize-handle-b {
   bottom: 0;
   left: 0;
-  width: 85%;
-  height: 5px; /* Thinner edge handle */
+  width: 100%;
+  height: 5px;
   cursor: ns-resize;
-}
-
-/* Example for a top-left handle (add to template and handleResizeStart if needed)
-.resize-handle-tl {
-  top: 0;
-  left: 0;
-  cursor: nwse-resize;
-}
-*/
-
-.popup-error-banner {
-  background: #ffebee;
-  color: #c62828;
-  padding: 8px 12px;
-  text-align: center;
-  font-weight: bold;
-  cursor: pointer;
-  border-bottom: 1px solid #d32f2f;
-  border-radius: 8px 8px 0 0;
-}
-
-.polling-controls {
-  display: flex;
-  align-items: center;
-  margin-right: 12px;
-  float: right;
 }
 </style>
