@@ -9,7 +9,7 @@ import { sendMessage, onMessage } from 'webext-bridge/content-script';
 import browser from 'webextension-polyfill';
 
 
-console.log("Extension: Content script loaded.");
+console.info("Extension: Content script loaded.");
 
 // --- State Variables (Τοπική Κατάσταση Αντίγραφο του Store) ---
 const localBackgroundState = ref<BackgroundState>({
@@ -23,7 +23,7 @@ const localBackgroundState = ref<BackgroundState>({
 // Pinia instance για τα Vue components στο content script.
 // Δεν θα συγχρονίζεται αυτόματα με το background, αλλά θα το ενημερώνουμε μέσω webext-bridge.
 const piniaInstanceForContentScript: Pinia = createPinia();
-let localMessageStore: ReturnType<typeof useMessageStore>; // Τοπικό store για τα components
+let localMessageStore: ReturnType<typeof useMessageStore> = useMessageStore(piniaInstanceForContentScript); // Τοπικό store για τα components
 
 
 // Vue app instances (παραμένουν)
@@ -158,40 +158,82 @@ function setupErrorNotificationSystemOnUI() {
 // --- Επικοινωνία με το Background Script ---
 async function requestInitialStateFromBackground() {
   try {
-    const initialState = await sendMessage('get-initial-state', undefined); // undefined αντί για tabId
-    if (initialState) {
-      // console.log("Extension (CS): Received initial state from BG:", initialState);
-      localBackgroundState.value = initialState;
-      // Ενημέρωση του τοπικού store με τα αρχικά δεδομένα
-      localMessageStore.currentApplicationId = initialState.currentApplicationId;
-      localMessageStore.messages = initialState.messages;
-      localMessageStore.isLoading = initialState.isLoading;
-      localMessageStore.lastError = initialState.lastError;
-      localMessageStore.changeCounters = initialState.changeCounters;
-      updateIconBadgeOnUI(initialState.changeCounters);
+    const initialState = await sendMessage('get-initial-state', null);
+    if (initialState && typeof initialState === 'object' && 'currentApplicationId' in initialState) {
+      const state = initialState as unknown as BackgroundState;
+      localBackgroundState.value = {
+        currentApplicationId: state.currentApplicationId,
+        messages: state.messages,
+        isLoading: state.isLoading,
+        lastError: state.lastError,
+        changeCounters: state.changeCounters,
+      };
+      if (localMessageStore) {
+        localMessageStore.currentApplicationId = state.currentApplicationId;
+        localMessageStore.messages = state.messages;
+        localMessageStore.isLoading = state.isLoading;
+        localMessageStore.lastError = state.lastError;
+        localMessageStore.changeCounters = state.changeCounters;
+      }
     }
   } catch (e) {
-    console.error("Extension (CS): Error requesting initial state:", e);
-    localBackgroundState.value.isLoading = false; // Σταμάτα το loading σε περίπτωση σφάλματος
+    console.warn("CS: Failed to get initial state", e);
   }
 }
 
-// Listeners για μηνύματα από το background
-onMessage('state-updated', ({ data }) => {
-  // console.log("Extension (CS): Received state-updated from BG:", data);
-  localBackgroundState.value = data;
-  // Ενημέρωση του τοπικού store
-  localMessageStore.currentApplicationId = data.currentApplicationId;
-  localMessageStore.messages = data.messages;
-  localMessageStore.isLoading = data.isLoading;
-  localMessageStore.lastError = data.lastError;
-  localMessageStore.changeCounters = data.changeCounters; // Αυτό θα ενεργοποιήσει το watch στο τοπικό store
-  updateIconBadgeOnUI(data.changeCounters);
+// Listen for messages from background script
+onMessage('state-updated', (message) => {
+  const data = message.data as unknown as {
+    currentApplicationId: string | null;
+    messages: ProcessedMessage[];
+    isLoading: boolean;
+    lastError: string | null;
+    changeCounters: {
+      newErrors: number;
+      newWarnings: number;
+      newInfos: number;
+      removedMessages: number;
+    };
+  };
+
+  if (!data || typeof data !== 'object') {
+    console.error("CS: Received invalid state update:", data);
+    return;
+  }
+
+  console.info("CS: Received state update:", {
+    appId: data.currentApplicationId,
+    messageCount: data.messages?.length || 0,
+    isLoading: data.isLoading,
+    hasError: !!data.lastError
+  });
+
+  if (localMessageStore) {
+    localMessageStore.$patch({
+      currentApplicationId: data.currentApplicationId,
+      messages: data.messages || [],
+      isLoading: data.isLoading,
+      lastError: data.lastError,
+      changeCounters: data.changeCounters || {
+        newErrors: 0,
+        newWarnings: 0,
+        newInfos: 0,
+        removedMessages: 0
+      }
+    });
+    console.info("CS: Local store updated with messages:", data.messages?.length || 0);
+  }
 });
 
 onMessage('show-error-notifications', ({ data }) => {
-  if (errorNotificationVm?.showErrorNotifications) {
+  if (data && Array.isArray(data) && errorNotificationVm?.showErrorNotifications) {
     errorNotificationVm.showErrorNotifications(data);
+  }
+});
+
+onMessage('clear-change-counters', () => {
+  if (localMessageStore) {
+    localMessageStore.clearChangeCounters();
   }
 });
 
@@ -218,6 +260,14 @@ async function mainContentScript() {
 
   // Αρχικοποίηση τοπικού store (θα ενημερώνεται από το background)
   localMessageStore = useMessageStore(piniaInstanceForContentScript);
+  localMessageStore.$patch({
+    messages: [],
+    currentApplicationId: null,
+    isLoading: false,
+    lastError: null,
+    changeCounters: { newErrors: 0, newWarnings: 0, newInfos: 0, removedMessages: 0 },
+    permanentlyDismissedMessageIds: []
+  });
 
   setupPersistentIconAndBadge();
   setupErrorNotificationSystemOnUI();

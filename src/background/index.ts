@@ -4,6 +4,8 @@ import { createPinia, Pinia } from 'pinia';
 import { useMessageStore } from '../stores/messages.store';
 import type { BackgroundState, MessagePayloads, BackgroundResponsePayloads, BackgroundEvents } from '../types/bridge';
 import browser from 'webextension-polyfill';
+import { info } from 'console';
+import { watch } from 'vue';
 
 console.info("Extension: Background script loaded.");
 
@@ -14,6 +16,8 @@ let messageStore: ReturnType<typeof useMessageStore>;
 let pollingIntervalId: number | null = null;
 const POLLING_INTERVAL = 20000; // 20 δευτερόλεπτα
 let activeTabIdForApp: number | null = null; // Για να ξέρουμε σε ποιο tab να στείλουμε updates
+let pollingEnabled = false;
+let pollingIntervalMs = POLLING_INTERVAL;
 
 // --- Λειτουργίες πυρήνα (παρόμοιες με πριν, αλλά στο background) ---
 
@@ -45,17 +49,18 @@ async function pollMessagesForStore() {
     return;
   }
 
+  console.info("BG: Starting message poll for app:", messageStore.currentApplicationId);
   messageStore.isLoading = true;
   messageStore.lastError = null;
 
   try {
     const postBody = {
-      etos: new Date().getFullYear(), // Το έτος μπορεί να χρειαστεί να είναι πιο δυναμικό ή παραμετροποιήσιμο
+      etos: new Date().getFullYear(),
       edeId: messageStore.currentApplicationId
     };
     const response = await fetch("https://eae2024.opekepe.gov.gr/eae2024/rest/MainService/checkAee?", {
       method: "POST",
-      headers: { /* ... τα headers σας ... */
+      headers: {
         "accept": "application/json, text/plain, */*",
         "content-type": "application/json",
         "cache-control": "no-cache",
@@ -69,60 +74,52 @@ async function pollMessagesForStore() {
     if (!response.ok) {
       const errorText = await response.text();
       messageStore.lastError = `Σφάλμα λήψης: ${response.status}`;
+      console.error("BG: Poll failed with status:", response.status, errorText);
       if (response.status === 401 || response.status === 403) {
         if (pollingIntervalId) clearInterval(pollingIntervalId);
         pollingIntervalId = null;
-        messageStore.setApplicationId(null);
+        messageStore.clearApplicationId();
       }
-      console.error(`Extension (BG): Error fetching messages - Status: ${response.status}`, errorText);
-      return; // Έξοδος αν υπάρχει σφάλμα για να μην γίνει updateMessages με παλιά δεδομένα
+      return;
     }
 
     const jsonData = await response.json();
+    console.info("BG: Poll response:", {
+      hasData: !!jsonData,
+      isArray: Array.isArray(jsonData.data),
+      messageCount: Array.isArray(jsonData.data) ? jsonData.data.length : 0
+    });
     if (jsonData && Array.isArray(jsonData.data)) {
-      messageStore.updateMessages(jsonData.data, messageStore.currentApplicationId); // Περνάμε και το ID για επιβεβαίωση
+      messageStore.updateMessages(jsonData.data, messageStore.currentApplicationId);
     } else {
       messageStore.updateMessages([], messageStore.currentApplicationId);
     }
   } catch (error: any) {
-    console.error("Extension (BG): Error during message polling fetch:", error);
+    console.error("BG: Error during message polling:", error);
     messageStore.lastError = error.message || "Άγνωστο σφάλμα δικτύου";
   } finally {
     messageStore.isLoading = false;
   }
 }
 
-function startOrUpdatePollingForStore(newAppId: string | null, tabId: number) {
-  if (!messageStore) return;
-  const oldAppId = messageStore.currentApplicationId;
-
-  if (oldAppId === newAppId && activeTabIdForApp === tabId) {
-    // Αν το ID είναι το ίδιο και το polling τρέχει για αυτό το tab, δεν κάνουμε κάτι
-    // εκτός αν το polling έχει σταματήσει για κάποιο λόγο
-    if (!pollingIntervalId && newAppId) {
-        // console.log(`Extension (BG): Polling was stopped, restarting for AppID: ${newAppId} on tab ${tabId}`);
-    } else if (!newAppId) {
-        // console.log(`Extension (BG): AppID is null, ensuring polling is stopped.`);
-    } else {
-        return;
-    }
+async function startOrUpdatePollingForStore(appId: string | null, tabId: number) {
+  if (!messageStore) {
+    console.error("Extension (BG): Message store not initialized for polling.");
+    return;
   }
-
-
-  activeTabIdForApp = newAppId ? tabId : null;
-  messageStore.setApplicationId(newAppId);
-
   if (pollingIntervalId) {
     clearInterval(pollingIntervalId);
     pollingIntervalId = null;
   }
-
-  if (newAppId) {
-    // console.log(`Extension (BG): Starting polling for AppID: ${newAppId} on tab ${tabId}`);
-    pollMessagesForStore();
-    pollingIntervalId = window.setInterval(pollMessagesForStore, POLLING_INTERVAL);
+  if (appId) {
+    messageStore.setApplicationId(appId);
   } else {
-    // console.log("Extension (BG): No AppID, polling stopped. Store cleared.");
+    messageStore.clearApplicationId();
+  }
+  activeTabIdForApp = tabId;
+  await pollMessagesForStore();
+  if (pollingEnabled && appId && typeof pollingIntervalMs === 'number' && !isNaN(pollingIntervalMs)) {
+    pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
   }
 }
 
@@ -165,22 +162,30 @@ browser.webNavigation.onHistoryStateUpdated.addListener(details => {
 // --- Αρχικοποίηση του store και Παρακολούθηση Αλλαγών του ---
 function initializeStoreAndWatch() {
     messageStore = useMessageStore(piniaInstance);
+    messageStore.clearApplicationId(); // Clean the id store at startup
 
     // Παρακολούθηση αλλαγών στο store για αποστολή στο content script
     messageStore.$subscribe(async (mutation, state) => {
         // console.log("Extension (BG): Store changed, attempting to send update to tab:", activeTabIdForApp, mutation.events);
         if (activeTabIdForApp) {
-            const currentBgState: BackgroundState = {
+            const currentBgState = {
                 currentApplicationId: state.currentApplicationId,
                 messages: state.messages,
                 isLoading: state.isLoading,
                 lastError: state.lastError,
                 changeCounters: state.changeCounters,
-            };
+            } as const;
             try {
+                console.info("BG: Sending state update to tab:", {
+                    tabId: activeTabIdForApp,
+                    appId: state.currentApplicationId,
+                    messageCount: state.messages.length,
+                    isLoading: state.isLoading,
+                    hasError: !!state.lastError
+                });
                 await sendMessage('state-updated', currentBgState, { context: 'content-script', tabId: activeTabIdForApp });
             } catch (e) {
-                // console.warn(`Extension (BG): Failed to send state-updated to tab ${activeTabIdForApp}`, e);
+                console.warn(`Extension (BG): Failed to send state-updated to tab ${activeTabIdForApp}`, e);
                 // Αν το tab δεν υπάρχει πια, ίσως πρέπει να καθαρίσουμε το activeTabIdForApp
                 try {
                     const tabInfo = await browser.tabs.get(activeTabIdForApp);
@@ -191,7 +196,7 @@ function initializeStoreAndWatch() {
             }
 
             // Ειδικός χειρισμός για νέες ειδοποιήσεις σφαλμάτων
-            if (mutation.events && mutation.events.key === 'changeCounters') {
+            if (mutation.events && 'key' in mutation.events && 'newValue' in mutation.events) {
                  const counters = mutation.events.newValue as BackgroundState['changeCounters'];
                  if (counters && counters.newErrors > 0) {
                     const newErrorMessages = state.messages.filter(m => m.type === 'Error' && m.firstSeen === m.lastSeen); // Απλή προσέγγιση για "νέα"
@@ -251,37 +256,116 @@ onMessage('get-initial-state', async ({ data, sender }) => {
   };
 });
 
-onMessage('dismiss-message-once', ({ data }) => {
-  if (messageStore) messageStore.dismissMessageOnce(data.messageId);
-});
-
-onMessage('dismiss-message-permanently', ({ data }) => {
-  if (messageStore) messageStore.dismissMessagePermanently(data.messageId);
+onMessage('dismiss-message', async (message) => {
+  const data = message.data as { messageId: string; permanent: boolean };
+  if (!data || !data.messageId) {
+    console.error("BG: Received invalid dismiss message data:", data);
+    return;
+  }
+  if (messageStore) {
+    if (data.permanent) {
+      await messageStore.dismissMessagePermanently(data.messageId);
+    } else {
+      messageStore.dismissMessageOnce(data.messageId);
+    }
+  }
 });
 
 onMessage('clear-change-counters', () => {
-  if (messageStore) messageStore.clearChangeCounters();
+  if (messageStore) {
+    messageStore.clearChangeCounters();
+  }
 });
 
-onMessage('popup-visibility-changed', ({ data, sender }) => {
-    if(data.visible && messageStore && sender.tabId === activeTabIdForApp) {
-        messageStore.clearChangeCounters();
-    }
+onMessage('popup-visibility-changed', async (message) => {
+  const data = message.data as unknown as { visible: boolean };
+  if (data?.visible && messageStore) {
+    messageStore.clearChangeCounters();
+  }
 });
 
-// Νέο handler για να παίρνει το URL από το content script σε περίπτωση που οι listeners του background δεν πιάνουν όλες τις αλλαγές
-onMessage('url-changed-for-id-check', ({data, sender}) => {
-    if (data.url && sender.tabId) {
-        const appId = extractApplicationIdFromUrl(data.url);
-        startOrUpdatePollingForStore(appId, sender.tabId);
+onMessage('url-changed', ({ data }) => {
+  if (data && typeof data === 'object' && 'url' in data) {
+    const appId = extractApplicationIdFromUrl(data.url as string);
+    if (appId && activeTabIdForApp !== null) {
+      startOrUpdatePollingForStore(appId, activeTabIdForApp);
     }
+  }
 });
 
 // Για να καθαρίσει το state αν κλείσει το σχετικό tab
 browser.tabs.onRemoved.addListener((tabId) => {
     if (tabId === activeTabIdForApp) {
-        console.log(`Extension (BG): Active tab ${tabId} was removed. Clearing application ID and stopping poll.`);
+        console.info(`Extension (BG): Active tab ${tabId} was removed. Clearing application ID and stopping poll.`);
         startOrUpdatePollingForStore(null, tabId);
         activeTabIdForApp = null;
     }
+});
+
+// Listen for messages from content script
+onMessage('url-changed-for-id-check', async (message) => {
+  const data = message.data as { url: string; tabId: number };
+  if (!data || !data.url) {
+    console.error("BG: Received invalid URL change data:", data);
+    return;
+  }
+  console.info("BG: Received URL change:", data.url);
+  const appId = extractApplicationIdFromUrl(data.url);
+  if (appId) {
+    console.info("BG: Extracted app ID:", appId);
+    if (data.tabId) {
+      startOrUpdatePollingForStore(appId, data.tabId);
+    }
+  } else {
+    console.info("BG: No app ID found in URL");
+    if (messageStore) {
+      messageStore.clearApplicationId();
+    }
+  }
+});
+
+// Subscribe to store changes
+watch(() => messageStore?.currentApplicationId, (newAppId) => {
+  if (newAppId && activeTabIdForApp) {
+    const currentBgState = {
+      currentApplicationId: newAppId,
+      messages: messageStore?.messages || [],
+      isLoading: messageStore?.isLoading || false,
+      lastError: messageStore?.lastError,
+      changeCounters: messageStore?.changeCounters || {
+        newErrors: 0,
+        newWarnings: 0,
+        newInfos: 0,
+        removedMessages: 0
+      }
+    };
+
+    // Send state update to content script
+    sendMessage('state-updated', currentBgState, { context: 'content-script', tabId: activeTabIdForApp }).catch((error) => {
+      console.warn("BG: Failed to send state update:", error);
+    });
+  }
+});
+
+// Manual polling control from content script
+onMessage('set-polling-enabled', ({ data }) => {
+  pollingEnabled = !!data;
+  if (pollingEnabled && messageStore?.currentApplicationId && activeTabIdForApp) {
+    if (pollingIntervalId) clearInterval(pollingIntervalId);
+    pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
+  } else if (!pollingEnabled && pollingIntervalId) {
+    clearInterval(pollingIntervalId);
+    pollingIntervalId = null;
+  }
+});
+
+onMessage('set-polling-interval', ({ data }) => {
+  const ms = Number(data);
+  if (!isNaN(ms) && ms > 1000) {
+    pollingIntervalMs = ms;
+    if (pollingEnabled && pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
+    }
+  }
 });

@@ -1,15 +1,15 @@
 <template>
-    <transition-group name="list" tag="div" class="error-notification-container">
-      <div v-for="notification in visibleNotifications" :key="notification.id" class="notification-item">
-        <div class="icon">❗</div>
-        <div class="content">
-          <strong>Σφάλμα:</strong>
-          <p>{{ notification.text }}</p>
-        </div>
-        <button @click="dismiss(notification.id)" title="Κλείσιμο">×</button>
+  <transition-group name="list" tag="div" class="error-notification-container">
+    <div v-for="notification in visibleNotifications" :key="notification.id" class="notification-item">
+      <div class="icon">❗</div>
+      <div class="content">
+        <strong>Σφάλμα:</strong>
+        <p>{{ notification.text }}</p>
       </div>
-    </transition-group>
-  </template>
+      <button @click="dismiss(notification.id)" title="Κλείσιμο">×</button>
+    </div>
+  </transition-group>
+</template>
   
   <script setup lang="ts">
   import { ref } from 'vue';

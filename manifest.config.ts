@@ -16,7 +16,7 @@ export default {
     email: "angelos.papamichail@gmail.com", // Update with your email
   },
   name: "OPEKEPE Community Helper", // Or your desired extension name
-  description: "Assists in selecting Δημοτική-Τοπική Κοινότητα on OPEKEPE forms.",
+  description: "Assists.",
   version: `${major}.${minor}.${patch}.${label}`,
   version_name: version,
   manifest_version: 3,

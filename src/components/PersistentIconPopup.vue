@@ -10,11 +10,22 @@
       height: state.height + 'px',
     }"
   >
+    <div v-if="showErrorBanner" class="popup-error-banner" @click="clearChangeCounters">
+      Νέα σφάλματα: {{ localMessageStore.changeCounters.newErrors }} (κάντε κλικ για εκκαθάριση)
+    </div>
     <div
       class="popup-header"
       @mousedown.prevent="handleDragStart"
     >
       <h4>Μηνύματα Αίτησης</h4>
+      <div class="polling-controls">
+        <label style="margin-right:8px; font-size:0.95em;">
+          <input type="checkbox" v-model="pollingEnabled" @change="onPollingToggle" />
+          Polling
+        </label>
+        <input type="number" min="2000" step="1000" v-model.number="pollingInterval" @change="onIntervalChange" style="width:70px; font-size:0.95em;" :disabled="!pollingEnabled" />
+        <span style="font-size:0.9em; color:#888; margin-left:4px;">ms</span>
+      </div>
       <button
         class="close-button"
         title="Close"
@@ -25,7 +36,7 @@
     </div>
 
     <div class="popup-body">
-      <MessagesDisplay /> 
+      <MessagesDisplay :messages="messagesToShow" /> 
     </div>
 
 
@@ -45,11 +56,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { useBrowserLocalStorage } from '../composables/useBrowserStorage';
 import MessagesDisplay from './MessagesDisplay.vue'; // Εισαγωγή του νέου component
 import { useMessageStore } from '../stores/messages.store'; // Για τον καθαρισμό του badge
 import { sendMessage } from 'webext-bridge/content-script';
+import { mockSystemMessages } from '../utils/mockData';
 
 interface PopupState {
   x: number;
@@ -61,6 +73,11 @@ interface PopupState {
 const isVisible = ref(false);
 const popupEl = ref<HTMLElement | null>(null);
 const localMessageStore = useMessageStore(); // Χρήση του τοπικού store που συγχρονίζεται από το background
+
+// DEV: Toggle to use mock data
+const useMockData = false; // Set to true for development/testing
+
+const messagesToShow = computed(() => useMockData ? mockSystemMessages : localMessageStore.messages);
 
 // --- State for Dragging and Resizing ---
 // ... (η υπόλοιπη λογική για drag/resize παραμένει ως έχει)
@@ -220,6 +237,21 @@ onUnmounted(() => {
 });
 
 defineExpose({ show, hide, toggleVisibility, isVisible }); // Expose isVisible
+
+const showErrorBanner = computed(() => localMessageStore.changeCounters.newErrors > 0);
+const clearChangeCounters = () => {
+  localMessageStore.clearChangeCounters();
+};
+
+const pollingEnabled = ref(false);
+const pollingInterval = ref(20000);
+
+const onPollingToggle = () => {
+  sendMessage('set-polling-enabled', pollingEnabled.value).catch(e => console.warn('Failed to set polling enabled', e));
+};
+const onIntervalChange = () => {
+  sendMessage('set-polling-interval', pollingInterval.value).catch(e => console.warn('Failed to set polling interval', e));
+};
 </script>
 
 <style scoped>
@@ -319,4 +351,22 @@ defineExpose({ show, hide, toggleVisibility, isVisible }); // Expose isVisible
   cursor: nwse-resize;
 }
 */
+
+.popup-error-banner {
+  background: #ffebee;
+  color: #c62828;
+  padding: 8px 12px;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+  border-bottom: 1px solid #d32f2f;
+  border-radius: 8px 8px 0 0;
+}
+
+.polling-controls {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  float: right;
+}
 </style>

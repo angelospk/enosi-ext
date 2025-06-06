@@ -14,10 +14,10 @@ export interface ProcessedMessage {
 }
 
 // Βοηθητική συνάρτηση για τη δημιουργία ενός απλού hash ID για τα μηνύματα
-function generateMessageId(rawText: string): string {
+function generateMessageId(text: string): string {
   let hash = 0;
-  for (let i = 0; i < rawText.length; i++) {
-    const char = rawText.charCodeAt(i);
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
     hash |= 0; // Μετατροπή σε 32bit integer
   }
@@ -39,7 +39,8 @@ function categorizeMessage(text: string): ProcessedMessage['type'] {
 
 
 function cleanMessageText(rawText: string): string {
-  return rawText.replace(/\s*\((?:Α\/Α [^:]+:|A\/A [^:]+:)\s*[^)]+\)$/, '').trim();
+  //change the regex to anything inside () and remove the ()
+  return rawText.replace(/\s*\(.*?\)$/, '').trim();
 }
 
 export const useMessageStore = defineStore('messages', () => {
@@ -52,24 +53,27 @@ export const useMessageStore = defineStore('messages', () => {
   const lastError = ref<string | null>(null);
 
   // Για το badge στο εικονίδιο
-  const changeCounters = ref<{ newErrors: number, newWarnings: number, newInfos: number, removedMessages: number }>({
-    newErrors: 0,
-    newWarnings: 0,
-    newInfos: 0,
+  const changeCounters = ref<{ newMessages: number, removedMessages: number }>({
+    newMessages: 0,
     removedMessages: 0
   });
 
-  function setApplicationId(appId: string | null) {
+  function setApplicationId(appId: string) {
     if (currentApplicationId.value !== appId) {
       console.log(`[MessageStore] Application ID changing from '${currentApplicationId.value}' to '${appId}'`);
       currentApplicationId.value = appId;
       messages.value = []; // Καθαρισμός μηνυμάτων για την παλιά αίτηση
-      // Επαναφορά των "dismissedOnce" αν είχαμε τέτοια λογική για session
-      changeCounters.value = { newErrors: 0, newWarnings: 0, newInfos: 0, removedMessages: 0 }; // Reset counters
+      changeCounters.value = { newMessages: 0, removedMessages: 0 }; // Reset counters
       if (!appId) {
           isLoading.value = false;
       }
     }
+  }
+  function clearApplicationId() {
+    currentApplicationId.value = null;
+    messages.value = [];
+    changeCounters.value = { newMessages: 0, removedMessages: 0 };
+    isLoading.value = false;
   }
 
   async function updateMessages(rawMessages: string[], newAppId?: string) {
@@ -99,7 +103,8 @@ export const useMessageStore = defineStore('messages', () => {
 
     // Επεξεργασία εισερχόμενων μηνυμάτων
     rawMessages.forEach((rawText, index) => {
-      const id = generateMessageId(rawText); // Βασισμένο στο περιεχόμενο
+      const cleanedText = cleanMessageText(rawText);
+      const id = generateMessageId(cleanedText); // Βασισμένο στο περιεχόμενο
 
       if (permanentlyDismissedMessageIds.value.includes(id)) {
         return; // Παράλειψη όσων έχουν απορριφθεί μόνιμα
@@ -112,7 +117,7 @@ export const useMessageStore = defineStore('messages', () => {
         // Ενημέρωση υπάρχοντος μηνύματος
         existingMessage.lastSeen = now;
         existingMessage.rawText = rawText; // Ενημέρωση κειμένου αν έχει αλλάξει ελαφρώς
-        existingMessage.cleanedText = cleanMessageText(rawText);
+        existingMessage.cleanedText = cleanedText;
         existingMessage.type = messageType; // Επαν-κατηγοριοποίηση
         existingMessage.isDismissedOnce = false; // Επαναφορά απόρριψης συνεδρίας
         newProcessedMessages.push(existingMessage);
@@ -121,7 +126,7 @@ export const useMessageStore = defineStore('messages', () => {
         newProcessedMessages.push({
           id,
           rawText,
-          cleanedText: cleanMessageText(rawText),
+          cleanedText: cleanedText,
           type: messageType,
           firstSeen: now,
           lastSeen: now,
@@ -140,9 +145,7 @@ export const useMessageStore = defineStore('messages', () => {
     ).length;
 
     changeCounters.value = {
-        newErrors: newErrorCount,
-        newWarnings: newWarningCount,
-        newInfos: newInfoCount,
+        newMessages: newProcessedMessages.length,
         removedMessages: removedMessagesCount
     };
 
@@ -169,6 +172,14 @@ export const useMessageStore = defineStore('messages', () => {
     messages.value = messages.value.filter(m => m.id !== messageId);
   }
 
+  async function restoreDismissedMessage(messageId: string) {
+    await dismissedPromise.value;
+    const idx = permanentlyDismissedMessageIds.value.indexOf(messageId);
+    if (idx !== -1) {
+      permanentlyDismissedMessageIds.value.splice(idx, 1);
+    }
+  }
+
   const visibleMessages = computed(() => {
     return messages.value.filter(
       m => !m.isDismissedOnce && !permanentlyDismissedMessageIds.value.includes(m.id)
@@ -180,7 +191,7 @@ export const useMessageStore = defineStore('messages', () => {
   const infoMessages = computed(() => visibleMessages.value.filter(m => m.type === 'Info'));
 
   function clearChangeCounters() {
-    changeCounters.value = { newErrors: 0, newWarnings: 0, newInfos: 0, removedMessages: 0 };
+    changeCounters.value = { newMessages: 0, removedMessages: 0 };
   }
 
   return {
@@ -192,11 +203,14 @@ export const useMessageStore = defineStore('messages', () => {
     changeCounters,
     errorMessages, // Ορατά σφάλματα
     warningMessages, // Ορατές προειδοποιήσεις
+    visibleMessages,
     infoMessages, // Ορατά ενημερωτικά
     setApplicationId,
+    clearApplicationId,
     updateMessages,
     dismissMessageOnce,
     dismissMessagePermanently,
+    restoreDismissedMessage,
     clearChangeCounters,
   };
 });

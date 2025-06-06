@@ -1,4 +1,4 @@
-import type { ProcessedMessage } from '@/stores/messages.store'; // Εισαγωγή του τύπου αν υπάρχει ήδη
+import type { ProcessedMessage } from '../stores/messages.store'; // Εισαγωγή του τύπου αν υπάρχει ήδη
 // Αν δεν υπάρχει ακόμα το store, μπορείς να ορίσεις τον τύπο προσωρινά εδώ:
 // interface ProcessedMessage {
 //   id: string;
