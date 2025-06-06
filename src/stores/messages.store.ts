@@ -82,18 +82,28 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   async function updateMessages(rawMessages: string[], newAppId?: string) {
-    // ... (initial logic remains the same) ...
+    if (newAppId && newAppId !== currentApplicationId.value) {
+        setApplicationId(newAppId);
+    }
+    if (!currentApplicationId.value && rawMessages.length === 0) {
+        messages.value = [];
+        isLoading.value = false;
+        return;
+    }
+
     isLoading.value = true;
     lastError.value = null;
     await dismissedPromise.value;
 
+    // --- STEP 1: ADD LOGGING FOR INCOMING RAW DATA ---
+    console.log(`[MessageStore] Fetched ${rawMessages.length} raw messages.`, rawMessages);
+
     const now = Date.now();
     const newProcessedMessages: ProcessedMessage[] = [];
     const incomingMessageIds = new Set<string>();
-
-    // **IMPROVEMENT**: Keep track of old message IDs for accurate change detection
     const existingMessageIds = new Set(messages.value.map(m => m.id));
 
+    // Process incoming messages
     rawMessages.forEach((rawText, index) => {
       const cleanedText = cleanMessageText(rawText);
       const id = generateMessageId(cleanedText);
@@ -101,31 +111,32 @@ export const useMessageStore = defineStore('messages', () => {
 
       const existingMessage = messages.value.find(m => m.id === id);
       if (existingMessage) {
-        existingMessage.lastSeen = now; // **KEY CHANGE**: Always update lastSeen
+        // This is an existing message, update its lastSeen timestamp
+        existingMessage.lastSeen = now;
         existingMessage.rawText = rawText;
         existingMessage.cleanedText = cleanedText;
         existingMessage.type = categorizeMessage(rawText);
         existingMessage.isDismissedOnce = false;
         newProcessedMessages.push(existingMessage);
       } else {
+        // This is a brand new message
         newProcessedMessages.push({
           id,
           rawText,
           cleanedText,
           type: categorizeMessage(rawText),
           firstSeen: now,
-          lastSeen: now,
+          lastSeen: now, // firstSeen and lastSeen are the same for new messages
           isDismissedOnce: false,
           originalIndex: index,
         });
       }
     });
 
-    // **IMPROVED LOGIC**: More accurate change detection
+    // Accurate change detection
     const newlyAddedCount = Array.from(incomingMessageIds).filter(id => !existingMessageIds.has(id)).length;
     const removedMessagesCount = Array.from(existingMessageIds).filter(id => !incomingMessageIds.has(id)).length;
 
-    // Only update counters if there's an actual change to avoid unnecessary banner flashes
     if (newlyAddedCount > 0 || removedMessagesCount > 0) {
         changeCounters.value = {
             newMessages: newlyAddedCount,
@@ -133,8 +144,17 @@ export const useMessageStore = defineStore('messages', () => {
         };
     }
 
-    // **KEY CHANGE**: Sort by lastSeen descending (newest first)
-    messages.value = newProcessedMessages.sort((a, b) => b.lastSeen - a.lastSeen);
+    // --- STEP 2: APPLY SORTING (NEWEST FIRST) ---
+    // Sort by the `lastSeen` timestamp in descending order.
+    // This places the most recently seen messages (new or updated) at the top.
+    const sortedMessages = newProcessedMessages.sort((a, b) => b.firstSeen - a.firstSeen);
+    
+    // Update the store's state
+    messages.value = sortedMessages;
+    
+    // --- STEP 3: LOG THE FINAL PROCESSED AND SORTED DATA ---
+    console.log(`[MessageStore] State updated with ${messages.value.length} processed and sorted messages.`, messages.value);
+
     isLoading.value = false;
   }
 
