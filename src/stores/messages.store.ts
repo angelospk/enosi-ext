@@ -44,26 +44,23 @@ function cleanMessageText(rawText: string): string {
 }
 
 export const useMessageStore = defineStore('messages', () => {
-  const currentApplicationId = ref<string | null>(null);
+  // This is now the "master list" of all messages for the current application,
+  // including those that are permanently dismissed. We will filter them for display using computed properties.
   const messages = ref<ProcessedMessage[]>([]);
   const { data: permanentlyDismissedMessageIds, promise: dismissedPromise } =
     useBrowserLocalStorage<string[]>('permanentlyDismissedSystemMessages', []);
-
+  
+  const currentApplicationId = ref<string | null>(null);
   const isLoading = ref(false);
   const lastError = ref<string | null>(null);
-
-  // Για το badge στο εικονίδιο
-  const changeCounters = ref<{ newMessages: number, removedMessages: number }>({
-    newMessages: 0,
-    removedMessages: 0
-  });
+  const changeCounters = ref<{ newMessages: number, removedMessages: number }>({ newMessages: 0, removedMessages: 0 });
 
   function setApplicationId(appId: string) {
     if (currentApplicationId.value !== appId) {
       console.log(`[MessageStore] Application ID changing from '${currentApplicationId.value}' to '${appId}'`);
       currentApplicationId.value = appId;
-      messages.value = []; // Καθαρισμός μηνυμάτων για την παλιά αίτηση
-      changeCounters.value = { newMessages: 0, removedMessages: 0 }; // Reset counters
+      messages.value = [];
+      changeCounters.value = { newMessages: 0, removedMessages: 0 };
       if (!appId) {
           isLoading.value = false;
       }
@@ -78,8 +75,6 @@ export const useMessageStore = defineStore('messages', () => {
 
   async function updateMessages(rawMessages: string[], newAppId?: string) {
     if (newAppId && newAppId !== currentApplicationId.value) {
-        // Αυτό δεν θα έπρεπε να συμβεί αν το setApplicationId καλείται πρώτα
-        console.warn("[MessageStore] updateMessages called with a new AppId, but currentApplicationId wasn't set. Syncing.")
         setApplicationId(newAppId);
     }
     if (!currentApplicationId.value && rawMessages.length === 0) {
@@ -88,77 +83,69 @@ export const useMessageStore = defineStore('messages', () => {
         return;
     }
 
-
     isLoading.value = true;
     lastError.value = null;
-    await dismissedPromise.value; // Βεβαιωθείτε ότι τα απορριφθέντα IDs έχουν φορτωθεί
+    await dismissedPromise.value;
 
     const now = Date.now();
     const newProcessedMessages: ProcessedMessage[] = [];
-    const incomingMessageTextSet = new Set<string>(rawMessages); // Για γρήγορο έλεγχο ύπαρξης
+    const incomingMessageIds = new Set<string>();
 
-    let newErrorCount = 0;
-    let newWarningCount = 0;
-    let newInfoCount = 0;
-
-    // Επεξεργασία εισερχόμενων μηνυμάτων
+    // Process incoming messages
     rawMessages.forEach((rawText, index) => {
       const cleanedText = cleanMessageText(rawText);
-      const id = generateMessageId(cleanedText); // Βασισμένο στο περιεχόμενο
-
-      if (permanentlyDismissedMessageIds.value.includes(id)) {
-        return; // Παράλειψη όσων έχουν απορριφθεί μόνιμα
-      }
+      const id = generateMessageId(cleanedText);
+      incomingMessageIds.add(id);
 
       const existingMessage = messages.value.find(m => m.id === id);
       const messageType = categorizeMessage(rawText);
 
       if (existingMessage) {
-        // Ενημέρωση υπάρχοντος μηνύματος
         existingMessage.lastSeen = now;
-        existingMessage.rawText = rawText; // Ενημέρωση κειμένου αν έχει αλλάξει ελαφρώς
+        existingMessage.rawText = rawText;
         existingMessage.cleanedText = cleanedText;
-        existingMessage.type = messageType; // Επαν-κατηγοριοποίηση
-        existingMessage.isDismissedOnce = false; // Επαναφορά απόρριψης συνεδρίας
+        existingMessage.type = messageType;
+        if (!existingMessage.isDismissedOnce) {
         newProcessedMessages.push(existingMessage);
+        }
+
       } else {
-        // Νέο μήνυμα
         newProcessedMessages.push({
           id,
           rawText,
-          cleanedText: cleanedText,
+          cleanedText,
           type: messageType,
           firstSeen: now,
           lastSeen: now,
           isDismissedOnce: false,
           originalIndex: index,
         });
-        if (messageType === 'Error') newErrorCount++;
-        else if (messageType === 'Warning') newWarningCount++;
-        else if (messageType === 'Info') newInfoCount++;
       }
     });
 
-    // Εντοπισμός αφαιρεμένων μηνυμάτων
+    // **CHANGE**: Identify removed messages based on ID, not raw text
     const removedMessagesCount = messages.value.filter(
-      oldMsg => !incomingMessageTextSet.has(oldMsg.rawText) && !permanentlyDismissedMessageIds.value.includes(oldMsg.id)
+      oldMsg => !incomingMessageIds.has(oldMsg.id)
     ).length;
+    
+    // **KEY CHANGE**: We update the change counters *before* filtering for visibility.
+    // This gives a more accurate count of what the API sent vs what is displayed.
+    const newVisibleMessages = newProcessedMessages.filter(m => !permanentlyDismissedMessageIds.value.includes(m.id));
 
     changeCounters.value = {
-        newMessages: newProcessedMessages.length,
+        newMessages: newVisibleMessages.length, // Count only what will be visible
         removedMessages: removedMessagesCount
     };
-
+    
+    // The main `messages` array now holds ALL messages from the last poll.
     messages.value = newProcessedMessages.sort((a,b) => (a.originalIndex ?? 0) - (b.originalIndex ?? 0));
     isLoading.value = false;
-    // console.log('[MessageStore] Messages updated:', messages.value.length, 'Change Counters:', changeCounters.value);
   }
 
   function dismissMessageOnce(messageId: string) {
     const message = messages.value.find(m => m.id === messageId);
     if (message) {
       message.isDismissedOnce = true;
-      // Για να μην εμφανίζεται άμεσα η αλλαγή στο badge, καθώς είναι απλή απόρριψη
     }
   }
 
@@ -166,10 +153,9 @@ export const useMessageStore = defineStore('messages', () => {
     await dismissedPromise.value;
     if (!permanentlyDismissedMessageIds.value.includes(messageId)) {
       permanentlyDismissedMessageIds.value.push(messageId);
-      // Το useBrowserLocalStorage θα αποθηκεύσει αυτόματα την αλλαγή
     }
-    // Αφαίρεση από την τρέχουσα προβολή
-    messages.value = messages.value.filter(m => m.id !== messageId);
+    // **KEY CHANGE**: We NO LONGER remove the message from the main `messages` array.
+    // The computed properties will now handle filtering it out from the visible list.
   }
 
   async function restoreDismissedMessage(messageId: string) {
@@ -177,13 +163,25 @@ export const useMessageStore = defineStore('messages', () => {
     const idx = permanentlyDismissedMessageIds.value.indexOf(messageId);
     if (idx !== -1) {
       permanentlyDismissedMessageIds.value.splice(idx, 1);
+      // Because `visibleMessages` and `permanentlyDismissedMessages` depend on this array,
+      // the UI will update instantly and reactively. No more waiting for the next poll.
     }
   }
+  
+  // *** COMPUTED PROPERTIES REFACTORED FOR CLARITY ***
 
+  // All messages that are not dismissed for the session or permanently.
+  // This is the list the user sees by default.
   const visibleMessages = computed(() => {
     return messages.value.filter(
       m => !m.isDismissedOnce && !permanentlyDismissedMessageIds.value.includes(m.id)
     );
+  });
+
+  // **NEW**: All messages that have been permanently dismissed.
+  // We can now easily get their text and other data because they are still in the main `messages` array.
+  const permanentlyDismissedMessages = computed(() => {
+    return messages.value.filter(m => permanentlyDismissedMessageIds.value.includes(m.id));
   });
 
   const errorMessages = computed(() => visibleMessages.value.filter(m => m.type === 'Error'));
@@ -195,16 +193,21 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   return {
+    // State
     currentApplicationId,
-    messages, // Η πλήρης λίστα των επεξεργασμένων (μη μόνιμα απορριφθέντων) μηνυμάτων
-    permanentlyDismissedMessageIds,
+    messages, // The full master list
     isLoading,
     lastError,
     changeCounters,
-    errorMessages, // Ορατά σφάλματα
-    warningMessages, // Ορατές προειδοποιήσεις
+
+    // Computed State for UI
     visibleMessages,
-    infoMessages, // Ορατά ενημερωτικά
+    permanentlyDismissedMessages, // <-- Export this new property
+    errorMessages,
+    warningMessages,
+    infoMessages,
+
+    // Actions
     setApplicationId,
     clearApplicationId,
     updateMessages,
