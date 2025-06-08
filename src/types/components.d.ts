@@ -13,7 +13,6 @@ declare module 'vue' {
     CommunityPopup: typeof import('./../components/CommunityPopup.vue')['default']
     DisplayError: typeof import('./../components/state/DisplayError.vue')['default']
     LoadingSpinner: typeof import('./../components/state/LoadingSpinner.vue')['default']
-    New: typeof import('./../components/state/New.vue')['default']
     PersistentIconPopup: typeof import('./../components/PersistentIconPopup.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterLinkUp: typeof import('./../components/RouterLinkUp.vue')['default']

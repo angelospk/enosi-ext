@@ -31,7 +31,7 @@ let optionsStoreInstance: any = null;
 // --- Helper: Find Input Element by Label ---
 function findInputElementByLabelText(labelText: string): HTMLInputElement | null {
     const labels = document.querySelectorAll<HTMLLabelElement>('label.q-field');
-    for (const label of labels) {
+    for (const label of Array.from(labels)) {
         const pElement = label.querySelector<HTMLParagraphElement>('.q-field__label p.text-weight-bold.text-body1');
         if (pElement) {
             const pClone = pElement.cloneNode(true) as HTMLParagraphElement;
@@ -152,8 +152,15 @@ async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Prom
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // More specific selector: targets the div with class q-tab__label that directly contains the text.
-    const tabSelector = `div.q-tab[role="tab"]:has(div.q-tab__label:contains('${tabText}'))`;
-    const tabElement = document.querySelector<HTMLElement>(tabSelector);
+    const tabElements = document.querySelectorAll<HTMLElement>('div.q-tab[role="tab"]');
+    let tabElement: HTMLElement | null = null;
+    for (const tab of Array.from(tabElements)) {
+        const label = tab.querySelector<HTMLDivElement>('.q-tab__label');
+        if (label && label.textContent?.trim() === tabText) {
+            tabElement = tab;
+            break;
+        }
+    }
 
     if (tabElement) {
         console.log(`Extension: Clicking tab "${tabText}"`, tabElement);
@@ -166,7 +173,7 @@ async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Prom
         await new Promise(resolve => setTimeout(resolve, 200)); // Delay for tab content to load
         return true;
     } else {
-        console.warn(`Extension: Tab "${tabText}" not found with selector: ${tabSelector}`);
+        console.warn(`Extension: Tab "${tabText}" not found.`);
         alert(`Extension: Δεν βρέθηκε η καρτέλα "${tabText}".`);
         return false;
     }
@@ -181,7 +188,7 @@ function setupCommunityPopupForInput(targetInput: HTMLInputElement, communityDat
     communityPopupContainer.id = 'community-helper-popup-container';
 
     const qFieldElement = targetInput.closest('.q-field');
-    if (qFieldElement) {
+    if (qFieldElement && qFieldElement instanceof HTMLElement) {
         qFieldElement.style.position = 'relative'; // For absolute positioning of popup
         qFieldElement.appendChild(communityPopupContainer); // Append inside q-field for better relative positioning
         communityPopupContainer.style.position = 'absolute';
@@ -220,14 +227,16 @@ function handleCommunityInputInteraction(inputElement: HTMLInputElement) {
     });
     inputElement.addEventListener('keydown', (event: KeyboardEvent) => {
         if (!communityPopupVm) return;
-        const actions = {
+        const actions: { [key: string]: () => void } = {
             'ArrowDown': () => { event.preventDefault(); communityPopupVm.show?.(); communityPopupVm.navigate?.('down'); },
             'ArrowUp': () => { event.preventDefault(); communityPopupVm.show?.(); communityPopupVm.navigate?.('up'); },
             'Enter': () => { event.preventDefault(); communityPopupVm.confirmSelection?.(); },
             'Tab': () => { if(communityPopupVm.isVisible) {event.preventDefault(); communityPopupVm.confirmSelection?.();} }, // Only prevent tab if popup is active
             'Escape': () => communityPopupVm.hide?.()
         };
-        actions[event.key]?.();
+        if (actions[event.key]) {
+            actions[event.key]();
+        }
     });
 }
 
@@ -276,7 +285,7 @@ function handleKeyboardShortcuts() {
             const keyForSwitch = event.key.toLowerCase() === 'ο' ? 'o' : event.key.toLowerCase();
 
             switch (keyForSwitch) {
-                case '1':
+                case '1': {
                     console.log("Extension: Ctrl + 1 pressed");
                     const appId = optionsStoreInstance.applicationId;
                     if (appId && appId !== "ID_NOT_SET") {
@@ -286,7 +295,8 @@ function handleKeyboardShortcuts() {
                         console.warn("Extension: Application ID not set for Ctrl+1 shortcut.");
                     }
                     break;
-                case '2':
+                }
+                case '2': {
                     console.log("Extension: Ctrl + 2 pressed for GDPR tab.");
                     const appIdForGdprCtrl2 = optionsStoreInstance.applicationId;
                     if (appIdForGdprCtrl2 && appIdForGdprCtrl2 !== "ID_NOT_SET") {
@@ -304,31 +314,38 @@ function handleKeyboardShortcuts() {
                         console.warn("Extension: Application ID not set for Ctrl+2.");
                     }
                     break;
-                case '3':
+                }
+                case '3': {
                     console.log("Extension: Ctrl + 3 pressed");
                     window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeemetcom';
                     break;
-                case '4':
+                }
+                case '4': {
                     console.log("Extension: Ctrl + 4 pressed");
                     window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeeagroi';
                     break;
-                case '5':
+                }
+                case '5': {
                     console.log("Extension: Ctrl + 5 pressed for Ιδιοκτησία tab.");
                     await navigateToTab('Ιδιοκτησία', '#/Edetedeaeeagroi');
                     break;
-                case '6':
+                }
+                case '6': {
                     console.log("Extension: Ctrl + 6 pressed for Οικολογικά Σχήματα tab.");
                     await navigateToTab('Οικολογικά Σχήματα', '#/Edetedeaeeagroi');
                     break;
-                case '7':
+                }
+                case '7': {
                     console.log("Extension: Ctrl + 7 pressed for Φυτικό Κεφάλαιο tab.");
                     await navigateToTab('Φυτικό Κεφάλαιο', '#/Edetedeaeeagroi');
                     break;
-                case '9':
+                }
+                case '9': {
                     console.log("Extension: Ctrl + 9 pressed");
                     window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeedikaiol';
                     break;
-                case '0':
+                }
+                case '0': {
                     console.log("Extension: Ctrl + 0 pressed to toggle extension visibility.");
                     if (persistentIconElement) {
                         const isHidden = persistentIconElement.style.display === 'none';
@@ -345,11 +362,29 @@ function handleKeyboardShortcuts() {
                         console.warn("Extension: Persistent icon element not found for Ctrl+0.");
                     }
                     break;
-                case 's':
+                }
+                case 's': {
                     console.log("Extension: Ctrl + S pressed for Save.");
-                    await clickElement("button.q-btn.btn_header_primary:has(i.material-icons:contains('save'))", "Save button");
+                    const buttons = document.querySelectorAll("button.btn_header_primary");
+                    let saveButton: HTMLButtonElement | null = null;
+                    for (const button of Array.from(buttons)) {
+                        const icon = button.querySelector("i.material-icons");
+                        if (icon && icon.textContent?.trim() === 'save') {
+                            saveButton = button as HTMLButtonElement;
+                            break;
+                        }
+                    }
+
+                    if (saveButton) {
+                        console.log(`Extension: Clicking Save button:`, saveButton);
+                        saveButton.click();
+                    } else {
+                       console.warn("Extension: Save button not found.");
+                       alert("Extension: Δεν βρέθηκε το κουμπί αποθήκευσης.");
+                    }
                     break;
-                case 'o':
+                }
+                case 'o': {
                     console.log("Extension: Ctrl + O pressed");
                     if (typeof togglePersistentIconPopup === 'function') {
                         togglePersistentIconPopup();
@@ -357,6 +392,7 @@ function handleKeyboardShortcuts() {
                         console.warn("Extension: togglePersistentIconPopup function not found.");
                     }
                     break;
+                }
                 default:
                     shortcutPerformed = false;
                     break;
