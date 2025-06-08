@@ -1,6 +1,6 @@
 // content-scripts/shortcuts.ts
 
-import { optionsStore } from './state';
+import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
@@ -33,16 +33,16 @@ async function handleShortcut(event: KeyboardEvent) {
 
   let shortcutPerformed = true;
   const key = event.key.toLowerCase();
-  const appId = optionsStore.applicationId;
+  const appId = messageStore.currentApplicationId;
 
   switch (key) {
     case '1':
       if (appId) window.location.href = `https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd?id=${appId}`;
-      else alert("ID Αίτησης δεν έχει οριστεί.");
+      // else alert("ID Αίτησης δεν έχει οριστεί.");
       break;
     case '2':
       if (appId) await navigateToTab('Συγκατάθεση GDPR', `#/Edetedeaeehd?id=${appId}`);
-      else alert("ID Αίτησης δεν έχει οριστεί.");
+      // else alert("ID Αίτησης δεν έχει οριστεί.");
       break;
     case '3':
       window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeemetcom';
@@ -65,9 +65,27 @@ async function handleShortcut(event: KeyboardEvent) {
     case '0':
       toggleUIVisibility();
       break;
-    case 's':
-      (document.querySelector("button.btn_header_primary i.material-icons:contains('save')")?.closest('button') as HTMLButtonElement)?.click();
+    case 'σ':
+    case 's': {
+      const buttons = document.querySelectorAll("button.btn_header_primary");
+      let saveButton: HTMLButtonElement | null = null;
+      for (const button of Array.from(buttons)) {
+          const icon = button.querySelector("i.material-icons");
+          if (icon && icon.textContent?.trim() === 'save') {
+              saveButton = button as HTMLButtonElement;
+              break;
+          }
+      }
+
+      if (saveButton) {
+          console.log(`Extension: Clicking Save button:`, saveButton);
+          saveButton.click();
+      } else {
+         console.warn("Extension: Save button not found.");
+         alert("Extension: Δεν βρέθηκε το κουμπί αποθήκευσης.");
+      }
       break;
+    }
     case 'o': // Greek 'ο' might map to 'o'
     case 'ο':
       togglePersistentPopup();

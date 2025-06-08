@@ -1,15 +1,12 @@
 // src/background/message-polling.ts
-import { useMessageStore } from '../stores/messages.store';
+import { messageStore } from './state';
 import { pollingEnabled, pollingIntervalMs } from './settings';
 import { fetchLastYearsData } from  './last-year-data'
-import { pinia } from '../utils/pinia';
 
 // --- Module State ---
 let pollingIntervalId: number | null = null;
 let activeTabIdForApp: number | null = null;
 let currentAppId: string | null = null;
-
-const messageStore = useMessageStore(pinia);
 
 /**
  * Extracts the application ID from the specific OPEKEPE URL hash.

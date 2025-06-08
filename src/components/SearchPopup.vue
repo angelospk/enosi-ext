@@ -41,11 +41,15 @@ const positionStyle = computed(() => {
   return {
     top: `${rect.bottom + window.scrollY}px`,
     left: `${rect.left + window.scrollX}px`,
-    width: `${rect.width}px`,
+    // width: `${rect.width}px`,
   };
 });
 
 function confirmSelection(item: SearchableItem) {
+  // simulate pressing Enter
+  const event = new KeyboardEvent('keydown', { key: 'Enter' });
+  document.dispatchEvent(event);
+
   emit('item-selected', item);
 }
 
@@ -60,6 +64,7 @@ function confirmSelection(item: SearchableItem) {
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   z-index: 2147483647;
+  width: fit-content;
   max-height: 300px;
   overflow-y: auto;
   font-family: sans-serif;

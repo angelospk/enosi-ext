@@ -132,7 +132,6 @@
     "onUpdated": true,
     "onWatcherCleanup": true,
     "pausableWatch": true,
-    "pinia": true,
     "portalTargetInjectionKey": true,
     "provide": true,
     "provideLocal": true,

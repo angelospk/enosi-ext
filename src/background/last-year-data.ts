@@ -1,17 +1,13 @@
 // src/background/last-year-data.ts
 import { onMessage, sendMessage } from 'webext-bridge/background';
 import { toRaw } from 'vue';
-import type { LastYearDataItem } from '../types/bridge';
+import type { LastYearDataItem, LastYearData } from '../types/bridge';
+import { messageStore } from './state';
 
 // --- Interfaces & Cache ---
-interface LastYearsData {
-  paa: LastYearDataItem[];
-  eco: LastYearDataItem[];
-  con: LastYearDataItem[];
-}
 interface LastYearDataCache {
   applicationId: string;
-  data: LastYearsData;
+  data: LastYearData;
 }
 
 let lastYearDataCache: LastYearDataCache | null = null;
@@ -26,7 +22,7 @@ export async function fetchLastYearsData(appId: string): Promise<void> {
   // If we have valid cached data, serve it immediately.
   if (lastYearDataCache?.applicationId === appId) {
     console.info('BG-Data: Serving last year data from cache for app:', appId);
-    sendMessage('last-year-data-updated', { data: toRaw(lastYearDataCache.data) }, 'popup').catch(e => console.warn(e));
+    sendMessage('last-year-data-updated', { data: toRaw(lastYearDataCache.data) } as any, 'popup').catch(e => console.warn(e));
     return;
   }
 
@@ -54,14 +50,14 @@ export async function fetchLastYearsData(appId: string): Promise<void> {
 
     const [paaRes, ecoRes, conRes] = await Promise.all(requests);
 
-    const result: LastYearsData = {
+    const result: LastYearData = {
       paa: paaRes.data.map((item: any) => ({ name: item.eaaId.description, code: item.eaaId.kodikos })),
-      eco: ecoRes.data.map((item: any) => ({ name: item.esgrId.esceId.description, code: item.esgrId.esceId.kodikos })),
-      con: conRes.data.map((item: any) => ({ name: item.eschId.description, code: item.eschId.kodikos })),
+      oikologika: ecoRes.data.map((item: any) => ({ name: item.esgrId.esceId.description, code: item.esgrId.esceId.kodikos })),
+      enisxyseis: conRes.data.map((item: any) => ({ name: item.eschId.description, code: item.eschId.kodikos })),
     };
 
     lastYearDataCache = { applicationId: appId, data: result };
-    sendMessage('last-year-data-updated', { data: toRaw(result), isLoading: false }, 'popup').catch(e => console.warn(e));
+    sendMessage('last-year-data-updated', { data: toRaw(result), isLoading: false } as any, 'popup').catch(e => console.warn(e));
     console.info('BG-Data: Successfully fetched and sent last year\'s data.');
   } catch (error: any) {
     console.error('BG-Data: Error fetching last year\'s data:', error);
@@ -75,7 +71,7 @@ export async function fetchLastYearsData(appId: string): Promise<void> {
  */
 export function registerLastYearDataHandlers(): void {
   onMessage('request-last-year-data-fetch', async () => {
-    const appId = useMessageStore(pinia).currentApplicationId;
+    const appId = messageStore.currentApplicationId;
     if (appId) {
       await fetchLastYearsData(appId);
     } else {

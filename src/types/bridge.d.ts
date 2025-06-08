@@ -25,10 +25,6 @@ export interface BackgroundState {
     newInfos: number;
     removedMessages: number;
   };
-  // Προσθέστε τυχόν άλλα πεδία κατάστασης που χρειάζονται τα components
-  'item-selected': Omit<SearchableItem, 'selection_count'>;
-  // Last year data
-  'get-last-year-data': void;
 }
 
 export interface MessagePayloads {

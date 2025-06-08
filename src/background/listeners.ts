@@ -2,12 +2,9 @@
 import browser from 'webextension-polyfill';
 import { onMessage, sendMessage } from 'webext-bridge/background';
 import { toRaw } from 'vue';
-import { useMessageStore } from '../stores/messages.store';
+import { messageStore } from './state';
 import { extractApplicationIdFromUrl, updatePollingState, getActiveTabId } from './message-polling';
 import type { BackgroundState } from '../types/bridge';
-import { pinia } from '../utils/pinia';
-
-const messageStore = useMessageStore(pinia);
 
 /**
  * Central handler for URL updates from any source (tab updates, activation, history changes).
@@ -66,7 +63,7 @@ export function subscribeToStoreChanges(): void {
 
     try {
       // Send the full state update to the content script
-      await sendMessage('state-updated', bgState, { context: 'content-script', tabId: activeTabId });
+      await sendMessage('state-updated', JSON.parse(JSON.stringify(bgState)), { context: 'content-script', tabId: activeTabId });
     } catch (e) {
       console.warn(`BG-Listeners: Failed to send state-updated to tab ${activeTabId}. It may have been closed.`, e);
       // The onRemoved listener will handle cleanup.
@@ -80,6 +77,14 @@ export function subscribeToStoreChanges(): void {
 export function registerMessageHandlers(): void {
   onMessage('get-bg-state', () => {
     return toRaw(messageStore.$state) as BackgroundState;
+  });
+
+  onMessage('url-changed-for-id-check', ({ data, sender }) => {
+    const url = (data as { url?: string })?.url;
+    const tabId = sender.tabId;
+    if (url && tabId) {
+      handleUrlUpdate(url, tabId);
+    }
   });
 
   onMessage('dismiss-message', async ({ data }) => {
