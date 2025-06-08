@@ -2,6 +2,7 @@ import { createApp, App as VueApp, ref } from 'vue';
 import CommunityPopup from '../components/CommunityPopup.vue';
 import PersistentIconPopup from '../components/PersistentIconPopup.vue'; // Import the new component
 import { createPinia } from 'pinia';
+import { useOptionsStore } from '../stores/options.store';
 
 // --- Interfaces ---
 interface CommunityItemRaw {
@@ -23,6 +24,8 @@ let persistentIconVueApp: VueApp<Element> | null = null;
 let persistentIconPopupVm: any = null;
 let persistentIconElement: HTMLElement | null = null;
 let persistentIconPopupContainer: HTMLDivElement | null = null;
+
+let optionsStoreInstance: any = null;
 
 
 // --- Helper: Find Input Element by Label ---
@@ -119,6 +122,56 @@ async function fetchCommunityData(sLkpenId_id: string): Promise<CommunityItem[]>
     }
 }
 
+// --- Helper: Click Element ---
+async function clickElement(selector: string, description: string): Promise<boolean> {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (element) {
+        console.log(`Extension: Clicking ${description}:`, element);
+        element.click();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for action to register
+        return true;
+    } else {
+        console.warn(`Extension: Element for ${description} not found with selector: ${selector}`);
+        alert(`Extension: Δεν βρέθηκε το στοιχείο για "${description}".`);
+        return false;
+    }
+}
+
+// --- Helper: Navigate to Tab ---
+async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
+    const currentPath = window.location.hash; // e.g., #/Edetedeaeeagroi
+    if (!currentPath.startsWith(requiredBaseUrlPath)) {
+        const mainPageUrl = `https://eae2024.opekepe.gov.gr/eae2024/${requiredBaseUrlPath}`;
+        console.log(`Extension: Not on the required page (${requiredBaseUrlPath}). Navigating to: ${mainPageUrl}`);
+        window.location.href = mainPageUrl;
+        // Wait for page navigation to likely complete before trying to click tab
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Adjust delay as needed
+    }
+
+    // Wait a bit for tab elements to be potentially rendered after navigation or on initial load
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // More specific selector: targets the div with class q-tab__label that directly contains the text.
+    const tabSelector = `div.q-tab[role="tab"]:has(div.q-tab__label:contains('${tabText}'))`;
+    const tabElement = document.querySelector<HTMLElement>(tabSelector);
+
+    if (tabElement) {
+        console.log(`Extension: Clicking tab "${tabText}"`, tabElement);
+        // Check if tab is already active
+        if (tabElement.classList.contains('q-tab--active')) {
+            console.log(`Extension: Tab "${tabText}" is already active.`);
+            return true;
+        }
+        tabElement.click();
+        await new Promise(resolve => setTimeout(resolve, 200)); // Delay for tab content to load
+        return true;
+    } else {
+        console.warn(`Extension: Tab "${tabText}" not found with selector: ${tabSelector}`);
+        alert(`Extension: Δεν βρέθηκε η καρτέλα "${tabText}".`);
+        return false;
+    }
+}
+
 // --- Community Helper Specific Functions ---
 function setupCommunityPopupForInput(targetInput: HTMLInputElement, communityData: CommunityItem[]) {
     if (communityPopupContainer && communityPopupContainer.parentElement) {
@@ -206,6 +259,117 @@ async function initializeCommunityHelper() {
     }
 }
 
+// --- Keyboard Shortcuts ---
+function handleKeyboardShortcuts() {
+    document.addEventListener('keydown', async (event) => {
+        if (!window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
+            return;
+        }
+
+        if (!optionsStoreInstance) {
+            console.warn("Extension: Options store not initialized for shortcuts.");
+            return;
+        }
+
+        if (event.ctrlKey) {
+            let shortcutPerformed = true;
+            const keyForSwitch = event.key.toLowerCase() === 'ο' ? 'o' : event.key.toLowerCase();
+
+            switch (keyForSwitch) {
+                case '1':
+                    console.log("Extension: Ctrl + 1 pressed");
+                    const appId = optionsStoreInstance.applicationId;
+                    if (appId && appId !== "ID_NOT_SET") {
+                        window.location.href = `https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd?id=${appId}`;
+                    } else {
+                        alert("Προσοχή: Το ID της αίτησης δεν έχει οριστεί στις επιλογές της επέκτασης.");
+                        console.warn("Extension: Application ID not set for Ctrl+1 shortcut.");
+                    }
+                    break;
+                case '2':
+                    console.log("Extension: Ctrl + 2 pressed for GDPR tab.");
+                    const appIdForGdprCtrl2 = optionsStoreInstance.applicationId;
+                    if (appIdForGdprCtrl2 && appIdForGdprCtrl2 !== "ID_NOT_SET") {
+                        const targetBaseUrlWithId = `https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd?id=${appIdForGdprCtrl2}`;
+                        if (window.location.href !== targetBaseUrlWithId) {
+                            if (!window.location.href.startsWith(`https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd`)){
+                                window.location.href = targetBaseUrlWithId;
+                                await new Promise(resolve => setTimeout(resolve, 1000)); // wait for navigation
+                            }
+                        }
+                        await navigateToTab('Συγκατάθεση GDPR', '#/Edetedeaeehd');
+
+                    } else {
+                        alert("Προσοχή: Το ID της αίτησης δεν έχει οριστεί (Ctrl+2).");
+                        console.warn("Extension: Application ID not set for Ctrl+2.");
+                    }
+                    break;
+                case '3':
+                    console.log("Extension: Ctrl + 3 pressed");
+                    window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeemetcom';
+                    break;
+                case '4':
+                    console.log("Extension: Ctrl + 4 pressed");
+                    window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeeagroi';
+                    break;
+                case '5':
+                    console.log("Extension: Ctrl + 5 pressed for Ιδιοκτησία tab.");
+                    await navigateToTab('Ιδιοκτησία', '#/Edetedeaeeagroi');
+                    break;
+                case '6':
+                    console.log("Extension: Ctrl + 6 pressed for Οικολογικά Σχήματα tab.");
+                    await navigateToTab('Οικολογικά Σχήματα', '#/Edetedeaeeagroi');
+                    break;
+                case '7':
+                    console.log("Extension: Ctrl + 7 pressed for Φυτικό Κεφάλαιο tab.");
+                    await navigateToTab('Φυτικό Κεφάλαιο', '#/Edetedeaeeagroi');
+                    break;
+                case '9':
+                    console.log("Extension: Ctrl + 9 pressed");
+                    window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeedikaiol';
+                    break;
+                case '0':
+                    console.log("Extension: Ctrl + 0 pressed to toggle extension visibility.");
+                    if (persistentIconElement) {
+                        const isHidden = persistentIconElement.style.display === 'none';
+                        persistentIconElement.style.display = isHidden ? 'flex' : 'none'; // Assuming default is flex
+
+                        if (persistentIconPopupVm && typeof persistentIconPopupVm.hide === 'function' && !isHidden) {
+                             persistentIconPopupVm.hide();
+                        }
+                        if (communityPopupContainer) {
+                            communityPopupContainer.style.display = isHidden ? 'block' : 'none';
+                        }
+                        console.log(`Extension: UI elements ${isHidden ? 'shown' : 'hidden'}.`);
+                    } else {
+                        console.warn("Extension: Persistent icon element not found for Ctrl+0.");
+                    }
+                    break;
+                case 's':
+                    console.log("Extension: Ctrl + S pressed for Save.");
+                    await clickElement("button.q-btn.btn_header_primary:has(i.material-icons:contains('save'))", "Save button");
+                    break;
+                case 'o':
+                    console.log("Extension: Ctrl + O pressed");
+                    if (typeof togglePersistentIconPopup === 'function') {
+                        togglePersistentIconPopup();
+                    } else {
+                        console.warn("Extension: togglePersistentIconPopup function not found.");
+                    }
+                    break;
+                default:
+                    shortcutPerformed = false;
+                    break;
+            }
+
+            if (shortcutPerformed) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }
+    });
+}
+
 // --- Persistent Icon & Its Popup Functions ---
 function createPersistentIcon() {
     if (document.getElementById('my-extension-persistent-icon')) return; // Already created
@@ -265,16 +429,22 @@ function togglePersistentIconPopup() {
 }
 
 // --- Main Initialization and Observation ---
-function main() {
+async function main() {
     if (!window.location.href.startsWith('https://eae2024.opekepe.gov.gr/eae2024')) {
         return;
     }
+
+    const contentScriptPinia = createPinia();
+    optionsStoreInstance = useOptionsStore(contentScriptPinia);
+    await optionsStoreInstance.applicationIdPromise;
+    console.log("Extension: Application ID loaded:", optionsStoreInstance.applicationId);
 
     // Create the persistent icon as soon as the content script runs on a matching page
     createPersistentIcon();
 
     // Attempt to initialize the community helper immediately
     initializeCommunityHelper();
+    handleKeyboardShortcuts();
 
     // Observe for dynamic changes in case the community input field loads later
     const observer = new MutationObserver(() => {
