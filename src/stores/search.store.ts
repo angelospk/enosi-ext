@@ -92,7 +92,7 @@ export const useSearchStore = defineStore('search', () => {
         },
         {
           category: 'Κ',
-          url: 'https://eae2024.opekepe.gov.gr/eae2024/rest/Edetzoiko/findAllByCriteriaRange_EdetzoikoGrpEdetzoiko',
+          url: 'https://eae2024.opekepe.gov.gr/eae2024/rest/Edetfytiko/findAllByCriteriaRange_EdetfytikoGrpEdetfytiko',
           body: { "gParams_yearEae": currentYear, "fromRowIndex": 0, "toRowIndex": 10000 },
           parser: (item: any) => ({ id: item.id, code: item.kodikos, name: item.description, category_code: 'Κ', selection_count: 0 }),
         }
