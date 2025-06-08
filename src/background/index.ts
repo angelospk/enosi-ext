@@ -3,7 +3,7 @@ import { onMessage, sendMessage } from 'webext-bridge/background';
 import { createPinia, Pinia } from 'pinia';
 import { useMessageStore } from '../stores/messages.store';
 import type { BackgroundState, MessagePayloads, BackgroundResponsePayloads, BackgroundEvents } from '../types/bridge';
-import browser from 'webextension-polyfill';
+import browser, { type Storage } from 'webextension-polyfill';
 import { info } from 'console';
 import { watch } from 'vue';
 
@@ -18,6 +18,49 @@ const POLLING_INTERVAL = 20000; // 20 δευτερόλεπτα
 let activeTabIdForApp: number | null = null; // Για να ξέρουμε σε ποιο tab να στείλουμε updates
 let pollingEnabled = false;
 let pollingIntervalMs = POLLING_INTERVAL;
+
+// --- Settings Management ---
+const POLLING_ENABLED_KEY = 'settings_pollingEnabled';
+const POLLING_INTERVAL_KEY = 'settings_pollingInterval';
+
+async function initializeSettings() {
+  const defaults = {
+    [POLLING_ENABLED_KEY]: false,
+    [POLLING_INTERVAL_KEY]: 20000,
+  };
+  const settings = await browser.storage.local.get(defaults);
+
+  pollingEnabled = settings[POLLING_ENABLED_KEY] as boolean;
+  pollingIntervalMs = settings[POLLING_INTERVAL_KEY] as number;
+
+  console.info(`Extension (BG): Initial settings loaded. Polling enabled: ${pollingEnabled}, Interval: ${pollingIntervalMs}ms`);
+}
+
+function handleSettingsChanges(changes: { [key: string]: Storage.StorageChange }, area: string) {
+  if (area !== 'local') return;
+
+  if (changes[POLLING_ENABLED_KEY]) {
+    pollingEnabled = !!changes[POLLING_ENABLED_KEY].newValue;
+    console.info(`Extension (BG): Polling enabled setting changed to: ${pollingEnabled}`);
+    if (messageStore?.currentApplicationId && activeTabIdForApp) {
+      startOrUpdatePollingForStore(messageStore.currentApplicationId, activeTabIdForApp);
+    }
+  }
+
+  if (changes[POLLING_INTERVAL_KEY]) {
+    const ms = Number(changes[POLLING_INTERVAL_KEY].newValue);
+    if (!isNaN(ms) && ms >= 2000) {
+      pollingIntervalMs = ms;
+      console.info(`Extension (BG): Polling interval setting changed to: ${pollingIntervalMs}ms`);
+      if (pollingEnabled && messageStore?.currentApplicationId && activeTabIdForApp) {
+        startOrUpdatePollingForStore(messageStore.currentApplicationId, activeTabIdForApp);
+      }
+    }
+  }
+}
+
+browser.storage.onChanged.addListener(handleSettingsChanges);
+initializeSettings();
 
 // --- Λειτουργίες πυρήνα (παρόμοιες με πριν, αλλά στο background) ---
 
@@ -202,11 +245,13 @@ function initializeStoreAndWatch() {
                     const newErrorMessages = state.messages.filter(m => m.type === 'Error' && m.firstSeen === m.lastSeen); // Απλή προσέγγιση για "νέα"
                     if (newErrorMessages.length > 0) {
                          try {
-                            await sendMessage(
-                                'show-error-notifications',
-                                newErrorMessages.slice(0, 3).map(e => ({id: e.id, text: e.cleanedText})),
-                                { context: 'content-script', tabId: activeTabIdForApp }
-                            );
+                            if (activeTabIdForApp !== null) {
+                                await sendMessage(
+                                    'show-error-notifications',
+                                    newErrorMessages.slice(0, 3).map(e => ({id: e.id, text: e.cleanedText})),
+                                    { context: 'content-script', tabId: activeTabIdForApp }
+                                );
+                            }
                          } catch (e) {
                             // console.warn(`Extension (BG): Failed to send show-error-notifications to tab ${activeTabIdForApp}`, e);
                          }
@@ -344,28 +389,5 @@ watch(() => messageStore?.currentApplicationId, (newAppId) => {
     sendMessage('state-updated', currentBgState, { context: 'content-script', tabId: activeTabIdForApp }).catch((error) => {
       console.warn("BG: Failed to send state update:", error);
     });
-  }
-});
-
-// Manual polling control from content script
-onMessage('set-polling-enabled', ({ data }) => {
-  pollingEnabled = !!data;
-  if (pollingEnabled && messageStore?.currentApplicationId && activeTabIdForApp) {
-    if (pollingIntervalId) clearInterval(pollingIntervalId);
-    pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
-  } else if (!pollingEnabled && pollingIntervalId) {
-    clearInterval(pollingIntervalId);
-    pollingIntervalId = null;
-  }
-});
-
-onMessage('set-polling-interval', ({ data }) => {
-  const ms = Number(data);
-  if (!isNaN(ms) && ms > 1000) {
-    pollingIntervalMs = ms;
-    if (pollingEnabled && pollingIntervalId) {
-      clearInterval(pollingIntervalId);
-      pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
-    }
   }
 });

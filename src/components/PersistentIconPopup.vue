@@ -114,7 +114,7 @@ const bannerText = computed(() => {
   if (messageStore.changeCounters.removedMessages > 0) {
     parts.push(`${messageStore.changeCounters.removedMessages} αφαιρέθηκαν`);
   }
-  return `Αλλαγές: ${parts.join(', ')}`;
+  return `${parts.join(', ')}`;
 });
 
 const clearChangeCounters = () => {
