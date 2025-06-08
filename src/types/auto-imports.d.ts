@@ -271,6 +271,7 @@ declare global {
   const useKbd: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useKbd.js')['useKbd']
   const useKeyModifier: typeof import('@vueuse/core')['useKeyModifier']
   const useLastChanged: typeof import('@vueuse/core')['useLastChanged']
+  const useLastYearDataStore: typeof import('../stores/lastYearData.store')['useLastYearDataStore']
   const useLink: typeof import('vue-router')['useLink']
   const useLocalStorage: typeof import('@vueuse/core')['useLocalStorage']
   const useLocale: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useLocale.js')['useLocale']
@@ -324,6 +325,7 @@ declare global {
   const useScriptTag: typeof import('@vueuse/core')['useScriptTag']
   const useScroll: typeof import('@vueuse/core')['useScroll']
   const useScrollLock: typeof import('@vueuse/core')['useScrollLock']
+  const useSearchStore: typeof import('../stores/search.store')['useSearchStore']
   const useSessionStorage: typeof import('@vueuse/core')['useSessionStorage']
   const useSettingsStore: typeof import('../stores/settings.store')['useSettingsStore']
   const useShare: typeof import('@vueuse/core')['useShare']
@@ -397,8 +399,14 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
+  export type { LastYearData } from '../stores/lastYearData.store'
+  import('../stores/lastYearData.store')
+  // @ts-ignore
   export type { ProcessedMessage } from '../stores/messages.store'
   import('../stores/messages.store')
+  // @ts-ignore
+  export type { DataCategoryCode, SearchableItem, RecentItem, AfmItem, AllData } from '../stores/search.store'
+  import('../stores/search.store')
   // @ts-ignore
   export type { MockExtensionSettings, MockKnowledgeItem } from '../utils/mockData'
   import('../utils/mockData')
@@ -654,6 +662,7 @@ declare module 'vue' {
     readonly useKbd: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useKbd.js')['useKbd']>
     readonly useKeyModifier: UnwrapRef<typeof import('@vueuse/core')['useKeyModifier']>
     readonly useLastChanged: UnwrapRef<typeof import('@vueuse/core')['useLastChanged']>
+    readonly useLastYearDataStore: UnwrapRef<typeof import('../stores/lastYearData.store')['useLastYearDataStore']>
     readonly useLink: UnwrapRef<typeof import('vue-router')['useLink']>
     readonly useLocalStorage: UnwrapRef<typeof import('@vueuse/core')['useLocalStorage']>
     readonly useLocale: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useLocale.js')['useLocale']>
@@ -705,6 +714,7 @@ declare module 'vue' {
     readonly useScriptTag: UnwrapRef<typeof import('@vueuse/core')['useScriptTag']>
     readonly useScroll: UnwrapRef<typeof import('@vueuse/core')['useScroll']>
     readonly useScrollLock: UnwrapRef<typeof import('@vueuse/core')['useScrollLock']>
+    readonly useSearchStore: UnwrapRef<typeof import('../stores/search.store')['useSearchStore']>
     readonly useSessionStorage: UnwrapRef<typeof import('@vueuse/core')['useSessionStorage']>
     readonly useSettingsStore: UnwrapRef<typeof import('../stores/settings.store')['useSettingsStore']>
     readonly useShare: UnwrapRef<typeof import('@vueuse/core')['useShare']>

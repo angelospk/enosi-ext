@@ -11,21 +11,62 @@
     }"
   >
     <!-- 1. ΝΕΟ: Banner που εμφανίζεται όταν υπάρχουν νέες αλλαγές (προσθήκες/αφαιρέσεις) -->
-    <div v-if="showUpdateBanner" class="popup-update-banner" @click="clearChangeCounters">
+    <div
+      v-if="showUpdateBanner"
+      class="popup-update-banner"
+      @click="clearChangeCounters"
+    >
       {{ bannerText }} (κάντε κλικ για εκκαθάριση)
     </div>
 
     <!-- 2. Header με τις καρτέλες (tabs) και το κουμπί κλεισίματος -->
-    <div class="popup-header" @mousedown.prevent="handleDragStart">
+    <div
+      class="popup-header"
+      @mousedown.prevent="handleDragStart"
+    >
       <div class="tab-buttons">
-        <button :class="{ active: activeTab === 'messages' }" @click="activeTab = 'messages'">
+        <button
+          :class="{ active: activeTab === 'messages' }"
+          @click="activeTab = 'messages'"
+        >
           Μηνύματα ({{ messageStore.visibleMessages.length }})
         </button>
-        <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
+        <button
+          :class="{ active: activeTab === 'lastYear' }"
+          @click="activeTab = 'lastYear'"
+        >
+          Περσινά
+        </button>
+        <button
+          :class="{ active: activeTab === 'totals' }"
+          @click="activeTab = 'totals'"
+          disabled
+          title="Σύντομα διαθέσιμο"
+        >
+          Συνολικά
+        </button>
+        <button
+          :class="{ active: activeTab === 'afm' }"
+          @click="activeTab = 'afm'"
+          disabled
+          title="Σύντομα διαθέσιμο"
+        >
+          AFM
+        </button>
+        <button
+          :class="{ active: activeTab === 'settings' }"
+          @click="activeTab = 'settings'"
+        >
           Ρυθμίσεις
         </button>
       </div>
-      <button class="close-button" title="Κλείσιμο" @click.stop="closePopupAndClearBadge">×</button>
+      <button
+        class="close-button"
+        title="Κλείσιμο"
+        @click.stop="closePopupAndClearBadge"
+      >
+        ×
+      </button>
     </div>
 
     <!-- 3. Κύριο περιεχόμενο που αλλάζει ανάλογα με την ενεργή καρτέλα -->
@@ -36,13 +77,37 @@
         <MessagesDisplay />
       </template>
 
+      <!-- Περιεχόμενο για την καρτέλα "Περσινά Στοιχεία" -->
+      <template v-if="activeTab === 'lastYear'">
+        <LastYearDataCard />
+      </template>
+
+      <!-- Placeholder for Totals Tab -->
+      <template v-if="activeTab === 'totals'">
+        <div class="placeholder-pane">
+          <h4>Συνολικά Στοιχεία Αίτησης</h4>
+          <p>Αυτή η λειτουργία θα είναι σύντομα διαθέσιμη.</p>
+        </div>
+      </template>
+
+      <!-- Placeholder for AFM Tab -->
+      <template v-if="activeTab === 'afm'">
+        <div class="placeholder-pane">
+          <h4>Διαχείριση Λεξικού ΑΦΜ</h4>
+          <p>Αυτή η λειτουργία θα είναι σύντομα διαθέσιμη.</p>
+        </div>
+      </template>
+
       <!-- Περιεχόμενο για την καρτέλα "Ρυθμίσεις" -->
       <template v-if="activeTab === 'settings'">
         <div class="settings-pane">
           <h4>Ρυθμίσεις Polling</h4>
           <div class="setting-item">
             <label>
-              <input type="checkbox" v-model="settingsStore.pollingEnabled" />
+              <input
+                v-model="settingsStore.pollingEnabled"
+                type="checkbox"
+              />
               Αυτόματη Ανανέωση
             </label>
           </div>
@@ -50,31 +115,43 @@
             <label for="polling-interval">Διάστημα (δευτερόλεπτα):</label>
             <input
               id="polling-interval"
+              v-model.number="pollingIntervalSeconds"
               type="number"
               min="2"
               step="1"
-              v-model.number="pollingIntervalSeconds"
               style="width: 70px;"
               :disabled="!settingsStore.pollingEnabled"
             />
           </div>
           <hr>
           <h4>Άλλες Ρυθμίσεις</h4>
-           <div class="setting-item-vertical">
+          <div class="setting-item-vertical">
             <label>
-              <input type="checkbox" v-model="settingsStore.restoreDismissedOnNewApp" />
+              <input
+                v-model="settingsStore.restoreDismissedOnNewApp"
+                type="checkbox"
+              />
               Επαναφορά απορριφθέντων σε νέα αίτηση
             </label>
-             <small>Όλα τα "αγνοημένα για πάντα" μηνύματα θα εμφανιστούν ξανά όταν επιλέξετε διαφορετική αίτηση.</small>
+            <small>Όλα τα "αγνοημένα για πάντα" μηνύματα θα εμφανιστούν ξανά όταν επιλέξετε διαφορετική αίτηση.</small>
           </div>
         </div>
       </template>
     </div>
 
     <!-- 4. Χειριστήρια για αλλαγή μεγέθους (παραμένουν ως είχαν) -->
-    <div class="resize-handle resize-handle-br" @mousedown.prevent="handleResizeStart($event, 'br')"></div>
-    <div class="resize-handle resize-handle-r" @mousedown.prevent="handleResizeStart($event, 'r')"></div>
-    <div class="resize-handle resize-handle-b" @mousedown.prevent="handleResizeStart($event, 'b')"></div>
+    <div
+      class="resize-handle resize-handle-br"
+      @mousedown.prevent="handleResizeStart($event, 'br')"
+    ></div>
+    <div
+      class="resize-handle resize-handle-r"
+      @mousedown.prevent="handleResizeStart($event, 'r')"
+    ></div>
+    <div
+      class="resize-handle resize-handle-b"
+      @mousedown.prevent="handleResizeStart($event, 'b')"
+    ></div>
   </div>
 </template>
 
@@ -82,9 +159,10 @@
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { useBrowserLocalStorage } from '../composables/useBrowserStorage';
 import MessagesDisplay from './MessagesDisplay.vue';
+import LastYearDataCard from './LastYearDataCard.vue';
 import { useMessageStore } from '../stores/messages.store';
 import { useSettingsStore } from '../stores/settings.store'; // Νέα εισαγωγή
-import { sendMessage } from 'webext-bridge/content-script';
+import { sendMessage, onMessage } from 'webext-bridge/content-script';
 
 interface PopupState {
   x: number;
@@ -95,21 +173,29 @@ interface PopupState {
 
 // --- State για την κατάσταση του Component ---
 const isVisible = ref(false);
-const activeTab = ref<'messages' | 'settings'>('messages');
+const activeTab = ref<'messages' | 'settings' | 'lastYear' | 'totals' | 'afm'>('messages');
 
 // --- Pinia Stores ---
 const messageStore = useMessageStore();
 const settingsStore = useSettingsStore();
 
+// Listen for application ID changes from the background script and update the message store
+onMessage('application-id-changed', (message) => {
+  const newAppId = message.data as string | null;
+  messageStore.setApplicationId(newAppId);
+});
+
 // --- Λογική για το Banner Ενημερώσεων ---
-const showUpdateBanner = computed(() =>
-  messageStore.changeCounters.newMessages > 0 || messageStore.changeCounters.removedMessages > 0
-);
+const showUpdateBanner = computed(() => {
+  const totalNew = messageStore.changeCounters.newErrors + messageStore.changeCounters.newWarnings + messageStore.changeCounters.newInfos;
+  return totalNew > 0 || messageStore.changeCounters.removedMessages > 0;
+});
 
 const bannerText = computed(() => {
   const parts = [];
-  if (messageStore.changeCounters.newMessages > 0) {
-    parts.push(`${messageStore.changeCounters.newMessages} νέα`);
+  const totalNew = messageStore.changeCounters.newErrors + messageStore.changeCounters.newWarnings + messageStore.changeCounters.newInfos;
+  if (totalNew > 0) {
+    parts.push(`${totalNew} νέα`);
   }
   if (messageStore.changeCounters.removedMessages > 0) {
     parts.push(`${messageStore.changeCounters.removedMessages} αφαιρέθηκαν`);

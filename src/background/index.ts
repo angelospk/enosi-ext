@@ -1,54 +1,45 @@
 // src/background/index.ts
 import { onMessage, sendMessage } from 'webext-bridge/background';
 import { createPinia, Pinia } from 'pinia';
+import { toRaw, ref, watch } from 'vue';
 import { useMessageStore } from '../stores/messages.store';
-import type { BackgroundState, MessagePayloads, BackgroundResponsePayloads, BackgroundEvents } from '../types/bridge';
+import { useSearchStore, type SearchableItem, type DataCategoryCode, type RecentItem } from '../stores/search.store';
+import type { BackgroundState, LastYearData } from '../types/bridge';
 import browser, { type Storage } from 'webextension-polyfill';
 import { info } from 'console';
-import { watch } from 'vue';
+import { useStorageLocal } from '../composables/useBrowserStorage';
+import { setupPinia } from '~/stores';
 
 console.info("Extension: Background script loaded.");
 
-const piniaInstance: Pinia = createPinia(); // Δημιουργία Pinia instance
-// Δεν χρειάζεται να κάνουμε app.use(piniaInstance) εδώ, καθώς το defineStore το χειρίζεται.
+const piniaInstance: Pinia = createPinia();
 
 let messageStore: ReturnType<typeof useMessageStore>;
+// let searchStore: ReturnType<typeof useSearchStore>;
 let pollingIntervalId: number | null = null;
-const POLLING_INTERVAL = 20000; // 20 δευτερόλεπτα
-let activeTabIdForApp: number | null = null; // Για να ξέρουμε σε ποιο tab να στείλουμε updates
+let activeTabIdForApp: number | null = null;
 let pollingEnabled = false;
-let pollingIntervalMs = POLLING_INTERVAL;
+let pollingIntervalMs = 20000;
 
 // --- Settings Management ---
 const POLLING_ENABLED_KEY = 'settings_pollingEnabled';
 const POLLING_INTERVAL_KEY = 'settings_pollingInterval';
 
-async function initializeSettings() {
-  const defaults = {
-    [POLLING_ENABLED_KEY]: false,
-    [POLLING_INTERVAL_KEY]: 20000,
-  };
-  const settings = await browser.storage.local.get(defaults);
-
-  pollingEnabled = settings[POLLING_ENABLED_KEY] as boolean;
-  pollingIntervalMs = settings[POLLING_INTERVAL_KEY] as number;
-
-  console.info(`Extension (BG): Initial settings loaded. Polling enabled: ${pollingEnabled}, Interval: ${pollingIntervalMs}ms`);
-}
-
 function handleSettingsChanges(changes: { [key: string]: Storage.StorageChange }, area: string) {
   if (area !== 'local') return;
 
-  if (changes[POLLING_ENABLED_KEY]) {
-    pollingEnabled = !!changes[POLLING_ENABLED_KEY].newValue;
+  const newPollingEnabled = changes[POLLING_ENABLED_KEY]?.newValue;
+  if (newPollingEnabled !== undefined) {
+    pollingEnabled = !!newPollingEnabled;
     console.info(`Extension (BG): Polling enabled setting changed to: ${pollingEnabled}`);
     if (messageStore?.currentApplicationId && activeTabIdForApp) {
       startOrUpdatePollingForStore(messageStore.currentApplicationId, activeTabIdForApp);
     }
   }
 
-  if (changes[POLLING_INTERVAL_KEY]) {
-    const ms = Number(changes[POLLING_INTERVAL_KEY].newValue);
+  const newInterval = changes[POLLING_INTERVAL_KEY]?.newValue;
+  if (newInterval !== undefined) {
+    const ms = Number(newInterval);
     if (!isNaN(ms) && ms >= 2000) {
       pollingIntervalMs = ms;
       console.info(`Extension (BG): Polling interval setting changed to: ${pollingIntervalMs}ms`);
@@ -60,9 +51,8 @@ function handleSettingsChanges(changes: { [key: string]: Storage.StorageChange }
 }
 
 browser.storage.onChanged.addListener(handleSettingsChanges);
-initializeSettings();
 
-// --- Λειτουργίες πυρήνα (παρόμοιες με πριν, αλλά στο background) ---
+// --- Core Logic ---
 
 function extractApplicationIdFromUrl(url: string): string | null {
   try {
@@ -81,14 +71,10 @@ function extractApplicationIdFromUrl(url: string): string | null {
 }
 
 async function pollMessagesForStore() {
-  if (!messageStore) {
-    console.error("Extension (BG): Message store not initialized for polling.");
-    return;
-  }
-  if (!messageStore.currentApplicationId) {
+  if (!messageStore || !messageStore.currentApplicationId) {
     if (pollingIntervalId) clearInterval(pollingIntervalId);
     pollingIntervalId = null;
-    messageStore.isLoading = false;
+    if (messageStore) messageStore.isLoading = false;
     return;
   }
 
@@ -97,27 +83,18 @@ async function pollMessagesForStore() {
   messageStore.lastError = null;
 
   try {
-    const postBody = {
-      etos: new Date().getFullYear(),
-      edeId: messageStore.currentApplicationId
-    };
+    const postBody = { etos: new Date().getFullYear(), edeId: messageStore.currentApplicationId };
     const response = await fetch("https://eae2024.opekepe.gov.gr/eae2024/rest/MainService/checkAee?", {
       method: "POST",
-      headers: {
-        "accept": "application/json, text/plain, */*",
-        "content-type": "application/json",
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-      },
+      headers: { "accept": "application/json, text/plain, */*", "content-type": "application/json", "cache-control": "no-cache", "pragma": "no-cache" },
       body: JSON.stringify(postBody),
       credentials: "include",
       mode: "cors"
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
       messageStore.lastError = `Σφάλμα λήψης: ${response.status}`;
-      console.error("BG: Poll failed with status:", response.status, errorText);
+      console.error("BG: Poll failed with status:", response.status, await response.text());
       if (response.status === 401 || response.status === 403) {
         if (pollingIntervalId) clearInterval(pollingIntervalId);
         pollingIntervalId = null;
@@ -127,267 +104,317 @@ async function pollMessagesForStore() {
     }
 
     const jsonData = await response.json();
-    console.info("BG: Poll response:", {
-      hasData: !!jsonData,
-      isArray: Array.isArray(jsonData.data),
-      messageCount: Array.isArray(jsonData.data) ? jsonData.data.length : 0
-    });
-    if (jsonData && Array.isArray(jsonData.data)) {
-      messageStore.updateMessages(jsonData.data, messageStore.currentApplicationId);
-    } else {
-      messageStore.updateMessages([], messageStore.currentApplicationId);
-    }
+    messageStore.updateMessages(Array.isArray(jsonData?.data) ? jsonData.data : [], messageStore.currentApplicationId);
   } catch (error: any) {
     console.error("BG: Error during message polling:", error);
     messageStore.lastError = error.message || "Άγνωστο σφάλμα δικτύου";
   } finally {
-    messageStore.isLoading = false;
+    if (messageStore) messageStore.isLoading = false;
   }
 }
 
 async function startOrUpdatePollingForStore(appId: string | null, tabId: number) {
-  if (!messageStore) {
-    console.error("Extension (BG): Message store not initialized for polling.");
-    return;
-  }
+  if (!messageStore) return;
+
   if (pollingIntervalId) {
     clearInterval(pollingIntervalId);
     pollingIntervalId = null;
   }
+  
+  messageStore.setApplicationId(appId);
+  
   if (appId) {
-    messageStore.setApplicationId(appId);
+      activeTabIdForApp = tabId;
+      fetchLastYearsData(appId);
+      await pollMessagesForStore();
+      if (pollingEnabled && typeof pollingIntervalMs === 'number' && !isNaN(pollingIntervalMs)) {
+          pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
+      }
   } else {
-    messageStore.clearApplicationId();
-  }
-  activeTabIdForApp = tabId;
-  await pollMessagesForStore();
-  if (pollingEnabled && appId && typeof pollingIntervalMs === 'number' && !isNaN(pollingIntervalMs)) {
-    pollingIntervalId = self.setInterval(pollMessagesForStore, pollingIntervalMs);
+      console.log("BG: No AppID provided. Polling stopped, but last known ID is kept.");
   }
 }
 
-// --- Listeners για Αλλαγές URL ---
-browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab?.url && tab.url.startsWith("https://eae2024.opekepe.gov.gr/eae2024/")) {
-    // console.log(`Extension (BG): Tab ${tabId} updated to ${tab.url}`);
-    const appId = extractApplicationIdFromUrl(tab.url);
-    startOrUpdatePollingForStore(appId, tabId);
-  }
-});
+function handleUrlUpdate(url: string | undefined, tabId: number) {
+    if (!url || !url.startsWith("https://eae2024.opekepe.gov.gr/eae2024/")) {
+        return; // Not on the target site, do nothing to keep the last known ID
+    }
 
-browser.tabs.onActivated.addListener(activeInfo => {
-  browser.tabs.get(activeInfo.tabId).then(tab => {
-    if (tab?.url && tab.url.startsWith("https://eae2024.opekepe.gov.gr/eae2024/")) {
-      // console.log(`Extension (BG): Tab ${activeInfo.tabId} activated: ${tab.url}`);
-      const appId = extractApplicationIdFromUrl(tab.url);
-      startOrUpdatePollingForStore(appId, activeInfo.tabId);
-    } else {
-      // Το ενεργό tab δεν είναι η σελίδα μας, σταματάμε το polling ή το αφήνουμε αν είναι συνδεδεμένο με άλλο tab
-      // Αυτή η λογική μπορεί να γίνει πιο περίπλοκη αν θέλουμε polling μόνο για το ενεργό tab
-      // Προς το παρόν, αν αλλάξει σε tab που δεν είναι η σελίδα μας, και το appId ήταν από αυτό το tab, το μηδενίζει.
-       if (activeTabIdForApp === activeInfo.tabId) { // Αν το polling ήταν για το tab που απενεργοποιήθηκε
-           // startOrUpdatePollingForStore(null, activeInfo.tabId); // Αμφιλεγόμενο αν πρέπει να το κάνει εδώ
-       }
+    const newAppId = extractApplicationIdFromUrl(url);
+
+    if (newAppId && newAppId !== messageStore.currentApplicationId) {
+        console.log(`Extension (BG): Found new application ID '${newAppId}' on tab ${tabId}. Updating store.`);
+        startOrUpdatePollingForStore(newAppId, tabId);
+    } else if (newAppId) {
+        activeTabIdForApp = tabId; // Same ID, but tab might have changed
+  }
+}
+
+// --- Task 1: Fetch and cache last year's data ---
+interface LastYearsData {
+  paa: any[];
+  eco: any[];
+  con: any[];
+}
+interface LastYearDataCache {
+  applicationId: string;
+  data: LastYearsData;
+}
+
+const applicationId = useStorageLocal<string | null>('application_id', null);
+
+// Initialize Pinia and stores
+const pinia = setupPinia();
+const searchStore = useSearchStore(pinia);
+
+// Keep a simple in-memory cache for the last fetched data
+let lastYearDataCache: LastYearDataCache | null = null;
+
+// Only on dev mode
+if (import.meta.hot) {
+  // ... existing code ...
+}
+
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'complete' || !tab.url) return;
+  // ... existing code ...
+  // ... existing code ...
+  watch(applicationId, (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      console.log('[Background] Application ID has changed to:', newId);
+      // Fetch data for the new application ID automatically
+      fetchLastYearsData(newId);
+      // Let the popup stores know about the change
+      sendMessage('application-id-changed', newId, 'popup').catch(e => console.error(e));
     }
   });
 });
 
-// Για SPA πλοήγηση εντός του hash
-browser.webNavigation.onHistoryStateUpdated.addListener(details => {
-  if (details.url && details.url.startsWith("https://eae2024.opekepe.gov.gr/eae2024/")) {
-    // console.log(`Extension (BG): History state updated for tab ${details.tabId} to ${details.url}`);
-    const appId = extractApplicationIdFromUrl(details.url);
-    startOrUpdatePollingForStore(appId, details.tabId);
+// Listen for requests from the popup to get last year's data
+onMessage('request-last-year-data-fetch', async () => {
+  const currentAppId = applicationId.value;
+
+  if (!currentAppId) {
+    return sendMessage('last-year-data-updated', { error: 'Δεν έχει επιλεγεί αίτηση.' }, 'popup');
   }
+
+  // If we have valid cached data for the current application, return it immediately
+  if (lastYearDataCache && lastYearDataCache.applicationId === currentAppId) {
+    console.log('[Background] Serving last year data from cache for app:', currentAppId);
+    return sendMessage('last-year-data-updated', { data: toRaw(lastYearDataCache.data) }, 'popup');
+  }
+
+  // Otherwise, trigger a new fetch
+  await fetchLastYearsData(currentAppId);
 });
 
+async function fetchLastYearsData(appId: string) {
+  console.log(`[Background] Fetching last year's data for application:`, appId);
+  // Send a start message so the UI can show a loading state
+  // Although the store sets loading to true, this could be useful for other listeners
+  await sendMessage('last-year-data-updated', { data: null, error: null }, 'popup');
 
-// --- Αρχικοποίηση του store και Παρακολούθηση Αλλαγών του ---
-function initializeStoreAndWatch() {
+  try {
+    const lastYear = new Date().getFullYear() - 1;
+
+    const endpoints = {
+        paa: 'https://eae2024.opekepe.gov.gr/eae2024/rest/Edetedeaeepaa/findAllByCriteriaRange_EdetedeaeehdGrpEdaa',
+        oikologika: 'https://eae2024.opekepe.gov.gr/eae2024/rest/Edetedeaeeeco/findAllByCriteriaRange_EdetedeaeehdGrpEdeg',
+        enisxyseis: 'https://eae2024.opekepe.gov.gr/eae2024/rest/Edetedeaeerequest/findAllByCriteriaRange_EdetedeaeehdGrpEdrq'
+    };
+
+    const requests = Object.entries(endpoints).map(([key, url]) => 
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                "edeId_id": appId,
+                "gParams_yearEae": lastYear,
+                "fromRowIndex": 0,
+                "toRowIndex": 10000
+            })
+        }).then(res => {
+            if (!res.ok) throw new Error(`Request failed for ${key} with status ${res.status}`);
+            return res.json();
+        })
+    );
+
+    const [paaRes, oikologikaRes, enisxyseisRes] = await Promise.all(requests);
+
+    const paaData = await paaRes.json();
+    const oikologikaData = await oikologikaRes.json();
+    const enisxyseisData = await enisxyseisRes.json();
+
+    const result: LastYearsData = {
+      paa: paaData.data.map((item: any) => ({ name: item.eaaId.description, code: item.eaaId.kodikos })),
+      eco: oikologikaData.data.map((item: any) => ({ name: item.esgrId.esceId.description, code: item.esgrId.esceId.kodikos })),
+      con: enisxyseisData.data.map((item: any) => ({ name: item.eschId.description, code: item.eschId.kodikos })),
+    };
+
+    // Cache the successful result
+    lastYearDataCache = { applicationId: appId, data: result };
+
+    await sendMessage('last-year-data-updated', { data: toRaw(result) }, 'popup');
+    console.log('[Background] Successfully fetched and sent last year\'s data.');
+  } catch (error: any) {
+    console.error('[Background] Error fetching last year\'s data:', error);
+    // Clear cache on error
+    lastYearDataCache = null;
+    await sendMessage('last-year-data-updated', { error: error.message || 'Άγνωστο σφάλμα' }, 'popup');
+  }
+}
+
+// --- Initialization and Listeners ---
+async function initialize() {
     messageStore = useMessageStore(piniaInstance);
-    messageStore.clearApplicationId(); // Clean the id store at startup
+    searchStore = useSearchStore(piniaInstance);
 
-    // Παρακολούθηση αλλαγών στο store για αποστολή στο content script
+    await searchStore.fetchAllInitialData();
+
+    const settings = await browser.storage.local.get({ [POLLING_ENABLED_KEY]: false, [POLLING_INTERVAL_KEY]: 20000 });
+    pollingEnabled = settings[POLLING_ENABLED_KEY] as boolean;
+    pollingIntervalMs = settings[POLLING_INTERVAL_KEY] as number;
+    console.info(`Extension (BG): Initial settings loaded. Polling enabled: ${pollingEnabled}, Interval: ${pollingIntervalMs}ms`);
+
     messageStore.$subscribe(async (mutation, state) => {
-        // console.log("Extension (BG): Store changed, attempting to send update to tab:", activeTabIdForApp, mutation.events);
         if (activeTabIdForApp) {
-            const currentBgState = {
-                currentApplicationId: state.currentApplicationId,
-                messages: state.messages,
-                isLoading: state.isLoading,
-                lastError: state.lastError,
-                changeCounters: state.changeCounters,
-            } as const;
             try {
-                console.info("BG: Sending state update to tab:", {
-                    tabId: activeTabIdForApp,
-                    appId: state.currentApplicationId,
-                    messageCount: state.messages.length,
-                    isLoading: state.isLoading,
-                    hasError: !!state.lastError
-                });
-                await sendMessage('state-updated', currentBgState, { context: 'content-script', tabId: activeTabIdForApp });
+                await sendMessage('state-updated', toRaw(state) as any, { context: 'content-script', tabId: activeTabIdForApp });
             } catch (e) {
                 console.warn(`Extension (BG): Failed to send state-updated to tab ${activeTabIdForApp}`, e);
-                // Αν το tab δεν υπάρχει πια, ίσως πρέπει να καθαρίσουμε το activeTabIdForApp
                 try {
-                    const tabInfo = await browser.tabs.get(activeTabIdForApp);
-                    if (!tabInfo) activeTabIdForApp = null;
-                } catch {
-                    activeTabIdForApp = null; // Το tab δεν υπάρχει
-                }
-            }
-
-            // Ειδικός χειρισμός για νέες ειδοποιήσεις σφαλμάτων
-            if (mutation.events && 'key' in mutation.events && 'newValue' in mutation.events) {
-                 const counters = mutation.events.newValue as BackgroundState['changeCounters'];
-                 if (counters && counters.newErrors > 0) {
-                    const newErrorMessages = state.messages.filter(m => m.type === 'Error' && m.firstSeen === m.lastSeen); // Απλή προσέγγιση για "νέα"
-                    if (newErrorMessages.length > 0) {
-                         try {
-                            if (activeTabIdForApp !== null) {
-                                await sendMessage(
-                                    'show-error-notifications',
-                                    newErrorMessages.slice(0, 3).map(e => ({id: e.id, text: e.cleanedText})),
-                                    { context: 'content-script', tabId: activeTabIdForApp }
-                                );
-                            }
-                         } catch (e) {
-                            // console.warn(`Extension (BG): Failed to send show-error-notifications to tab ${activeTabIdForApp}`, e);
-                         }
-                    }
-                 }
+                    if (!(await browser.tabs.get(activeTabIdForApp))) activeTabIdForApp = null;
+                } catch { activeTabIdForApp = null; }
             }
         }
     });
-}
-initializeStoreAndWatch();
 
-
-// --- Handlers για Μηνύματα από το Content Script ---
-onMessage('get-initial-state', async ({ data, sender }) => {
-  const tabId = sender.tabId;
-  if (!tabId) return null;
-
-  // Ελέγχουμε αν το τρέχον URL του tab έχει ID
-  const tab = await browser.tabs.get(tabId);
-  if (tab?.url) {
-      const appIdFromUrl = extractApplicationIdFromUrl(tab.url);
-      // Αν το ID του tab είναι διαφορετικό από το τρέχον ID του store ή αν δεν υπάρχει τρέχον ID στο store,
-      // κάνουμε "επανεκκίνηση" του polling για αυτό το tab.
-      if (appIdFromUrl !== messageStore.currentApplicationId || (appIdFromUrl && !messageStore.currentApplicationId)) {
-          startOrUpdatePollingForStore(appIdFromUrl, tabId);
-      } else if (!appIdFromUrl && messageStore.currentApplicationId && activeTabIdForApp === tabId) {
-          // Αν το URL του tab δεν έχει ID πια, αλλά το store έχει ID από αυτό το tab
-          startOrUpdatePollingForStore(null, tabId);
-      }
-  }
-
-
-  if (activeTabIdForApp !== tabId && messageStore.currentApplicationId) {
-      // Αν το αίτημα έρχεται από tab που δεν είναι το "ενεργό" για το store,
-      // αλλά το store έχει δεδομένα, ίσως να μην θέλουμε να τα δώσουμε ή να ξεκινήσουμε νέο polling.
-      // Προς το παρόν, επιστρέφουμε την τρέχουσα κατάσταση του store,
-      // αλλά η λογική του activeTabIdForApp θα πρέπει να είναι πιο αυστηρή.
-      // console.warn(`Extension (BG): get-initial-state from non-active tab ${tabId}, current active for store is ${activeTabIdForApp}`);
-  }
-
-  return {
-    currentApplicationId: messageStore.currentApplicationId,
-    messages: messageStore.messages,
-    isLoading: messageStore.isLoading,
-    lastError: messageStore.lastError,
-    changeCounters: messageStore.changeCounters,
-  };
-});
-
-onMessage('dismiss-message', async (message) => {
-  const data = message.data as { messageId: string; permanent: boolean };
-  if (!data || !data.messageId) {
-    console.error("BG: Received invalid dismiss message data:", data);
-    return;
-  }
-  if (messageStore) {
-    if (data.permanent) {
-      await messageStore.dismissMessagePermanently(data.messageId);
-    } else {
-      messageStore.dismissMessageOnce(data.messageId);
-    }
-  }
-});
-
-onMessage('clear-change-counters', () => {
-  if (messageStore) {
-    messageStore.clearChangeCounters();
-  }
-});
-
-onMessage('popup-visibility-changed', async (message) => {
-  const data = message.data as unknown as { visible: boolean };
-  if (data?.visible && messageStore) {
-    messageStore.clearChangeCounters();
-  }
-});
-
-onMessage('url-changed', ({ data }) => {
-  if (data && typeof data === 'object' && 'url' in data) {
-    const appId = extractApplicationIdFromUrl(data.url as string);
-    if (appId && activeTabIdForApp !== null) {
-      startOrUpdatePollingForStore(appId, activeTabIdForApp);
-    }
-  }
-});
-
-// Για να καθαρίσει το state αν κλείσει το σχετικό tab
-browser.tabs.onRemoved.addListener((tabId) => {
-    if (tabId === activeTabIdForApp) {
-        console.info(`Extension (BG): Active tab ${tabId} was removed. Clearing application ID and stopping poll.`);
-        startOrUpdatePollingForStore(null, tabId);
-        activeTabIdForApp = null;
-    }
-});
-
-// Listen for messages from content script
-onMessage('url-changed-for-id-check', async (message) => {
-  const data = message.data as { url: string; tabId: number };
-  if (!data || !data.url) {
-    console.error("BG: Received invalid URL change data:", data);
-    return;
-  }
-  console.info("BG: Received URL change:", data.url);
-  const appId = extractApplicationIdFromUrl(data.url);
-  if (appId) {
-    console.info("BG: Extracted app ID:", appId);
-    if (data.tabId) {
-      startOrUpdatePollingForStore(appId, data.tabId);
-    }
-  } else {
-    console.info("BG: No app ID found in URL");
-    if (messageStore) {
-      messageStore.clearApplicationId();
-    }
-  }
-});
-
-// Subscribe to store changes
-watch(() => messageStore?.currentApplicationId, (newAppId) => {
-  if (newAppId && activeTabIdForApp) {
-    const currentBgState = {
-      currentApplicationId: newAppId,
-      messages: messageStore?.messages || [],
-      isLoading: messageStore?.isLoading || false,
-      lastError: messageStore?.lastError,
-      changeCounters: messageStore?.changeCounters || {
-        newErrors: 0,
-        newWarnings: 0,
-        newInfos: 0,
-        removedMessages: 0
-      }
-    };
-
-    // Send state update to content script
-    sendMessage('state-updated', currentBgState, { context: 'content-script', tabId: activeTabIdForApp }).catch((error) => {
-      console.warn("BG: Failed to send state update:", error);
+    browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === 'complete' && tab?.url) handleUrlUpdate(tab.url, tabId);
     });
+    browser.tabs.onActivated.addListener(activeInfo => {
+      browser.tabs.get(activeInfo.tabId).then(tab => handleUrlUpdate(tab.url, activeInfo.tabId));
+    });
+    browser.webNavigation.onHistoryStateUpdated.addListener(details => {
+      if (details.url) handleUrlUpdate(details.url, details.tabId);
+    });
+}
+
+// --- Message Handlers ---
+
+onMessage('get-bg-state', () => {
+  return toRaw(messageStore.$state) as BackgroundState;
+});
+
+onMessage('get-search-suggestions', ({ data }) => {
+    const { searchTerm } = data as { searchTerm: string };
+    
+    const normalizedTerm = searchTerm.toUpperCase();
+    const prefixMatch = normalizedTerm.match(/^([ΚΠΔΜΟΣΤΑΤ])([!/])(.*)$/);
+
+    let results: SearchableItem[] = [];
+
+    if (prefixMatch) {
+        const category = prefixMatch[1] as DataCategoryCode;
+        const searchType = prefixMatch[2];
+        const relevantSearchTerm = prefixMatch[3].toLowerCase();
+
+        if (searchType === '!') { 
+            results = (toRaw(searchStore.recentAndPopular.value) || [])
+                .filter((item: SearchableItem) => item.category_code === category && item.name.toLowerCase().includes(relevantSearchTerm));
+        } else { 
+            const searchSpace = toRaw(searchStore.allData.value[category]) || [];
+            results = searchSpace.filter((item: SearchableItem) => item.name.toLowerCase().includes(relevantSearchTerm));
+        }
+    } else {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        
+        const recentResults = (toRaw(searchStore.recentAndPopular.value) || [])
+            .filter((item: SearchableItem) => item.name.toLowerCase().includes(lowerSearchTerm));
+
+        const recentResultCodes = new Set(recentResults.map((r: SearchableItem) => `${r.category_code}-${r.code}`));
+        const allDataResults: SearchableItem[] = [];
+
+        for (const categoryKey in searchStore.allData.value) {
+            const category = categoryKey as DataCategoryCode;
+            const items = toRaw(searchStore.allData.value[category]) || [];
+
+            for(const item of items) {
+                const uniqueId = `${item.category_code}-${item.code}`;
+                if (!recentResultCodes.has(uniqueId) && item.name.toLowerCase().includes(lowerSearchTerm)) {
+                    allDataResults.push(item);
+                }
+            }
+        }
+        
+        results = [...recentResults, ...allDataResults];
+    }
+    
+    return results.slice(0, 20);
+});
+
+onMessage('item-selected', ({ data }) => {
+    const selectedItem = data as Omit<SearchableItem, 'selection_count'>;
+    if (selectedItem?.code && selectedItem?.category_code) {
+        searchStore.handleSelection(selectedItem);
   }
 });
+
+// Search Functionality
+// =================================================================
+onMessage('search:query', async ({ data: queryData }) => {
+  const { query, category_code } = queryData;
+  console.log(`[Background] Received search query: '${query}' in category: ${category_code}`);
+
+  await searchStore.fetchAllInitialData(); // Ensures data is loaded
+
+  const results: SearchableItem[] = [];
+  const lowerCaseQuery = query.toLowerCase();
+
+  const recent = toRaw(searchStore.recentAndPopular);
+  const allData = toRaw(searchStore.allData);
+
+  // 1. Search in Recent & Popular if no specific category is given
+  if (!category_code) {
+    for (const item of recent) {
+      if (item.name.toLowerCase().includes(lowerCaseQuery) || item.code.toLowerCase().includes(lowerCaseQuery)) {
+        results.push(item);
+      }
+    }
+  }
+
+  // 2. Search in allData (respecting category if provided)
+  const categoriesToSearch = category_code ? [category_code] : Object.keys(allData) as DataCategoryCode[];
+
+  for (const cat of categoriesToSearch) {
+    const dataList = allData[cat];
+    if (dataList) {
+      for (const item of dataList) {
+        if (item.name.toLowerCase().includes(lowerCaseQuery) || item.code.toLowerCase().includes(lowerCaseQuery)) {
+          // Avoid duplicates from recent search
+          if (!results.some(r => r.code === item.code && r.category_code === item.category_code)) {
+            results.push(item);
+          }
+        }
+      }
+    }
+  }
+
+  // Sort results: prioritize recent items, then by name
+  results.sort((a, b) => {
+    const aIsRecent = recent.some(r => r.code === a.code && r.category_code === a.category_code);
+    const bIsRecent = recent.some(r => r.code === b.code && r.category_code === b.category_code);
+    if (aIsRecent && !bIsRecent) return -1;
+    if (!aIsRecent && bIsRecent) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  
+  console.log(`[Background] Sending ${results.length} search results.`);
+  return results.slice(0, 50); // Limit results
+});
+
+onMessage('search:handle-selection', async ({ data: selectedItem }) => {
+  await searchStore.handleSelection(selectedItem);
+});
+
+initialize();
