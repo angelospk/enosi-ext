@@ -4,6 +4,7 @@ import { createApp, ref, watch, ComponentPublicInstance, h } from 'vue';
 import { sendMessage } from 'webext-bridge/content-script';
 import SearchPopup from '../components/SearchPopup.vue';
 import type { SearchableItem, DataCategoryCode } from '../stores/search.store';
+import { getIsUIVisible } from './ui';
 
 // --- Module-level state for the search popup ---
 const searchResults = ref<SearchableItem[]>([]);
@@ -70,6 +71,8 @@ function hideSearchPopup() {
 
 function setupEventListeners() {
   document.addEventListener('focusin', (e) => {
+    if (!getIsUIVisible()) return;
+
     const target = e.target as HTMLInputElement;
     const isSearchable = target.tagName === 'INPUT' && target.closest('.q-field')?.querySelector('.q-field__append .q-icon[role="img"]')?.textContent?.trim() === 'search';
     if (isSearchable) {

@@ -25,6 +25,10 @@ let iconBadgeElement: HTMLSpanElement | null = null;
 let persistentIconPopupVm: PersistentIconPopupInstance | null = null;
 let errorNotificationVm: ErrorNotificationInstance | null = null;
 
+// --- State for UI visibility ---
+let isUIVisible = true;
+export const getIsUIVisible = () => isUIVisible;
+
 function createPersistentIcon() {
   if (document.getElementById('my-extension-persistent-icon')) return;
 
@@ -54,6 +58,7 @@ function createPersistentIcon() {
   persistentIconElement.onmouseleave = () => { iconStyle.transform = 'scale(1)'; };
 
   persistentIconElement.addEventListener('click', async () => {
+    if (!isUIVisible) return;
     persistentIconPopupVm?.toggleVisibility();
     await sendMessage('popup-visibility-changed', { visible: persistentIconPopupVm?.isVisible ?? false });
   });
@@ -138,14 +143,18 @@ export function showErrorNotifications(messages: ProcessedMessage[]) {
  * Toggles the visibility of the entire extension UI on the page.
  */
 export function toggleUIVisibility() {
-  if (!persistentIconElement) return;
-  const isHidden = persistentIconElement.style.display === 'none';
-  persistentIconElement.style.display = isHidden ? 'flex' : 'none';
+  isUIVisible = !isUIVisible; // Toggle the state
+
+  if (persistentIconElement) {
+    persistentIconElement.style.display = isUIVisible ? 'flex' : 'none';
+  }
+
   // Also hide the popup if we are hiding the icon
-  if (!isHidden) {
+  if (!isUIVisible) {
     persistentIconPopupVm?.hide();
   }
-  console.info(`Extension: UI elements ${isHidden ? 'shown' : 'hidden'}.`);
+
+  console.info(`Extension: UI elements ${isUIVisible ? 'shown' : 'hidden'}.`);
 }
 
 /**
