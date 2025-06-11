@@ -54,10 +54,6 @@ function setupMessageListeners() {
       showErrorNotifications(data as unknown as ProcessedMessage[]);
     }
   });
-
-  onMessage('clear-change-counters', () => {
-    messageStore.clearChangeCounters();
-  });
 }
 
 /**

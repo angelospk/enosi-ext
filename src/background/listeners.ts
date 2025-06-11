@@ -7,6 +7,31 @@ import { extractApplicationIdFromUrl, updatePollingState, getActiveTabId } from 
 import type { BackgroundState } from '../types/bridge';
 
 /**
+ * Creates a plain, serializable object from the reactive Pinia store state.
+ * This prevents "circular structure" errors when sending state to other contexts.
+ */
+function createSerializableState(state: BackgroundState): BackgroundState {
+  const plainMessages = state.messages.map(msg => ({
+    id: msg.id,
+    rawText: msg.rawText,
+    cleanedText: msg.cleanedText,
+    type: msg.type,
+    firstSeen: msg.firstSeen,
+    lastSeen: msg.lastSeen,
+    isDismissedOnce: msg.isDismissedOnce,
+    originalIndex: msg.originalIndex,
+  }));
+
+  return {
+    currentApplicationId: state.currentApplicationId,
+    messages: plainMessages,
+    isLoading: state.isLoading,
+    lastError: state.lastError,
+    changeCounters: JSON.parse(JSON.stringify(state.changeCounters)),
+  };
+}
+
+/**
  * Central handler for URL updates from any source (tab updates, activation, history changes).
  * @param url The URL that changed.
  * @param tabId The ID of the tab where the change occurred.
@@ -59,11 +84,10 @@ export function subscribeToStoreChanges(): void {
     const activeTabId = getActiveTabId();
     if (!activeTabId) return;
 
-    const bgState = toRaw(state) as BackgroundState;
-
     try {
       // Send the full state update to the content script
-      await sendMessage('state-updated', JSON.parse(JSON.stringify(bgState)), { context: 'content-script', tabId: activeTabId });
+      const serializableState = createSerializableState(state as BackgroundState);
+      await sendMessage('state-updated', serializableState as any, { context: 'content-script', tabId: activeTabId });
     } catch (e) {
       console.warn(`BG-Listeners: Failed to send state-updated to tab ${activeTabId}. It may have been closed.`, e);
       // The onRemoved listener will handle cleanup.
@@ -76,7 +100,8 @@ export function subscribeToStoreChanges(): void {
  */
 export function registerMessageHandlers(): void {
   onMessage('get-bg-state', () => {
-    return toRaw(messageStore.$state) as BackgroundState;
+    // Ensure we are sending a plain, serializable object.
+    return createSerializableState(messageStore.$state as BackgroundState);
   });
 
   onMessage('url-changed-for-id-check', ({ data, sender }) => {
