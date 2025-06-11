@@ -98,6 +98,7 @@ export async function updatePollingState(newAppId: string | null, tabId: number)
   // If the App ID is new, update everything
   if (newAppId && newAppId !== currentAppId) {
     console.log(`BG-Polling: New application ID detected: '${newAppId}'. Updating state.`);
+    messageStore.clearApplicationId();
     currentAppId = newAppId;
     activeTabIdForApp = tabId;
     messageStore.setApplicationId(newAppId);
@@ -114,11 +115,11 @@ export async function updatePollingState(newAppId: string | null, tabId: number)
     activeTabIdForApp = tabId;
   } else if (!newAppId && currentAppId) {
     // Navigated away from a page with an App ID
-    console.log("BG-Polling: Navigated away from application page. Clearing state.");
-    currentAppId = null;
-    activeTabIdForApp = null;
-    messageStore.clearApplicationId();
-    stopPolling();
+    console.log("BG-Polling: Navigated away from application page.");
+    // currentAppId = null;
+    // activeTabIdForApp = null;
+    // messageStore.clearApplicationId();
+    // stopPolling();
   }
 }
 

@@ -40,7 +40,7 @@ function handleUrlUpdate(url: string | undefined, tabId: number): void {
   if (!url || !url.startsWith("https://eae2024.opekepe.gov.gr/eae2024/")) {
     // If the user navigates to a non-OPEKEPE page in the active tab, we might want to clear the state.
     if (tabId === getActiveTabId()) {
-        updatePollingState(null, tabId);
+        // updatePollingState(null, tabId);
     }
     return;
   }

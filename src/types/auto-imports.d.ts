@@ -7,6 +7,7 @@
 export {}
 declare global {
   const $t: typeof import('vue-i18n')['$t']
+  const EAE_YEAR: typeof import('../utils/api_helpers')['EAE_YEAR']
   const EffectScope: typeof import('vue')['EffectScope']
   const Gumroad: typeof import('../utils/payment/gumroad')['Gumroad']
   const Notification: typeof import('notivue')['Notification']
@@ -51,9 +52,11 @@ declare global {
   const defineStore: typeof import('pinia')['defineStore']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
+  const executeSync: typeof import('../utils/api_helpers')['executeSync']
   const extPay: typeof import('../utils/payment/extPay')['extPay']
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const extractShortcuts: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.js')['extractShortcuts']
+  const fetchApi: typeof import('../utils/api_helpers')['fetchApi']
   const firebaseApp: typeof import('../utils/firebase')['firebaseApp']
   const firebaseConfig: typeof import('../utils/firebase')['firebaseConfig']
   const firestore: typeof import('../utils/firebase')['firestore']
@@ -125,6 +128,7 @@ declare global {
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
   const pinia: typeof import('../utils/pinia')['pinia']
   const portalTargetInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/usePortal.js')['portalTargetInjectionKey']
+  const prepareEntityForRequest: typeof import('../utils/api_helpers')['prepareEntityForRequest']
   const productsRef: typeof import('../utils/firebase')['productsRef']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
@@ -164,6 +168,7 @@ declare global {
   const supabaseClient: typeof import('../utils/supabase/supabase')['supabaseClient']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
+  const synchronizeChanges: typeof import('../utils/api_helpers')['synchronizeChanges']
   const t: typeof import('vue-i18n')['t']
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
@@ -432,6 +437,7 @@ import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
+    readonly EAE_YEAR: UnwrapRef<typeof import('../utils/api_helpers')['EAE_YEAR']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly appRouter: UnwrapRef<typeof import('../utils/router/index')['appRouter']>
@@ -470,8 +476,10 @@ declare module 'vue' {
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly executeSync: UnwrapRef<typeof import('../utils/api_helpers')['executeSync']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly extractShortcuts: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.js')['extractShortcuts']>
+    readonly fetchApi: UnwrapRef<typeof import('../utils/api_helpers')['fetchApi']>
     readonly formBusInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formBusInjectionKey']>
     readonly formFieldInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formFieldInjectionKey']>
     readonly formInputsInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formInputsInjectionKey']>
@@ -531,6 +539,7 @@ declare module 'vue' {
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly portalTargetInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/usePortal.js')['portalTargetInjectionKey']>
+    readonly prepareEntityForRequest: UnwrapRef<typeof import('../utils/api_helpers')['prepareEntityForRequest']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
@@ -557,6 +566,7 @@ declare module 'vue' {
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
+    readonly synchronizeChanges: UnwrapRef<typeof import('../utils/api_helpers')['synchronizeChanges']>
     readonly t: UnwrapRef<typeof import('vue-i18n')['t']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>

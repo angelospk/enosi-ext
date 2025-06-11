@@ -2,6 +2,7 @@
 
 import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
+import { copyAgrotemaxioData, copyBioflagToTargets } from './opekepe_actions';
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
   const currentPath = window.location.hash;
@@ -64,6 +65,14 @@ async function handleShortcut(event: KeyboardEvent) {
       break;
     case '0':
       toggleUIVisibility();
+      break;
+    case 'ι':
+    case 'i':
+      copyAgrotemaxioData(appId || '');
+      break;
+    case 'b':
+    case 'β':
+      copyBioflagToTargets(appId || '');
       break;
     case 'σ':
     case 's': {
