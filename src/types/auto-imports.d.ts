@@ -73,6 +73,7 @@ declare global {
   const getProductsAndPrices: typeof import('../utils/firebase')['getProductsAndPrices']
   const getSubscription: typeof import('../utils/firebase')['getSubscription']
   const h: typeof import('vue')['h']
+  const handleMassUpdateFromJson: typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']
   const i18n: typeof import('../utils/i18n')['i18n']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
@@ -489,6 +490,7 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
+    readonly handleMassUpdateFromJson: UnwrapRef<typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']>
     readonly i18n: UnwrapRef<typeof import('../utils/i18n')['i18n']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>

@@ -2,9 +2,10 @@ export const EAE_YEAR = 2025;
 
 /**
  * Performs a fetch request to the specified API endpoint.
+ * Handles responses with and without a JSON body.
  * @param endpoint - The API endpoint to call.
  * @param body - The request payload.
- * @returns The JSON response from the API.
+ * @returns The JSON response from the API, or null if the response body is empty.
  */
 export const fetchApi = async (endpoint: string, body: any): Promise<any> => {
     const url = `https://eae2024.opekepe.gov.gr/eae2024/rest/${endpoint}`;
@@ -18,15 +19,30 @@ export const fetchApi = async (endpoint: string, body: any): Promise<any> => {
             credentials: 'include',
             body: JSON.stringify(body)
         });
+
         if (!response.ok) {
             let errorText = await response.text();
             try {
+                // Προσπάθησε να διαβάσεις το μήνυμα σφάλματος αν είναι JSON
                 const errorJson = JSON.parse(errorText);
-                errorText = errorJson.message || errorText;
-            } catch (e) { /* Ignore */ }
-            throw new Error(`API Error ${response.status}: ${errorText}`);
+                errorText = errorJson.message || JSON.stringify(errorJson);
+            } catch (e) { /* Αγνοούμε το σφάλμα αν το errorText δεν είναι JSON */ }
+            throw new Error(`API Error ${response.status} on ${endpoint}: ${errorText}`);
         }
-        return await response.json();
+
+        // ---- Η ΣΗΜΑΝΤΙΚΗ ΑΛΛΑΓΗ ΕΙΝΑΙ ΕΔΩ ----
+        // 1. Παίρνουμε την απάντηση ως κείμενο πρώτα
+        const text = await response.text();
+        
+        // 2. Ελέγχουμε αν το κείμενο έχει περιεχόμενο πριν το κάνουμε parse
+        // Αν το text είναι ένα κενό string, η συνθήκη θα είναι false.
+        if (text) {
+            return JSON.parse(text);
+        }
+        
+        // 3. Αν η απάντηση είναι κενή, επιστρέφουμε null για να μην κρασάρει η εφαρμογή.
+        return null; 
+
     } catch (error) {
         console.error(`Fetch failed for ${endpoint}:`, error);
         throw error;

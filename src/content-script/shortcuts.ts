@@ -42,11 +42,11 @@ async function handleShortcut(event: KeyboardEvent) {
 
   switch (key) {
     case '1':
-      if (appId) await navigateToTab('Γενικά Στοιχεία Αιτούντα', `#/Edetedeaeehd?id=${appId}`);
+      await navigateToTab('Γενικά Στοιχεία Αιτούντα', `#/Edetedeaeehd?id=${appId}`);
       // else alert("ID Αίτησης δεν έχει οριστεί.");
       break;
     case '2':
-      if (appId) await navigateToTab('Συγκατάθεση GDPR', `#/Edetedeaeehd?id=${appId}`);
+      await navigateToTab('Συγκατάθεση GDPR', `#/Edetedeaeehd?id=${appId}`);
       // else alert("ID Αίτησης δεν έχει οριστεί.");
       break;
     case '3':
@@ -118,6 +118,7 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('Μη έγκυρο JSON.');
         break;
       }
+      console.log('jsonInput', jsonInput);
       await handleMassUpdateFromJson(jsonInput, appId);
       break;
     }

@@ -86,6 +86,7 @@
     "getCurrentInstance": true,
     "getCurrentScope": true,
     "h": true,
+    "handleMassUpdateFromJson": true,
     "i18n": true,
     "ignorableWatch": true,
     "inject": true,
