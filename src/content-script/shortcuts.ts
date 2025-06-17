@@ -3,6 +3,8 @@
 import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
 import { copyAgrotemaxioData, copyBioflagToTargets } from './opekepe_actions';
+import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR } from '../utils/api_helpers';
+import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
   const currentPath = window.location.hash;
@@ -29,6 +31,8 @@ async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Prom
   return false;
 }
 
+
+
 async function handleShortcut(event: KeyboardEvent) {
   if (!event.ctrlKey) return;
 
@@ -38,7 +42,7 @@ async function handleShortcut(event: KeyboardEvent) {
 
   switch (key) {
     case '1':
-      if (appId) window.location.href = `https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd?id=${appId}`;
+      if (appId) await navigateToTab('Γενικά Στοιχεία Αιτούντα', `#/Edetedeaeehd?id=${appId}`);
       // else alert("ID Αίτησης δεν έχει οριστεί.");
       break;
     case '2':
@@ -99,6 +103,24 @@ async function handleShortcut(event: KeyboardEvent) {
     case 'ο':
       togglePersistentPopup();
       break;
+    case 'μ':
+    case 'm': {
+      if (!appId) {
+        alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
+        break;
+      }
+      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική ενημέρωση:');
+      if (!input) break;
+      let jsonInput;
+      try {
+        jsonInput = JSON.parse(input);
+      } catch (e) {
+        alert('Μη έγκυρο JSON.');
+        break;
+      }
+      await handleMassUpdateFromJson(jsonInput, appId);
+      break;
+    }
     default:
       shortcutPerformed = false;
       break;
