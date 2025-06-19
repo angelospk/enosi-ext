@@ -5,6 +5,7 @@ import { toggleUIVisibility, togglePersistentPopup } from './ui';
 import { copyAgrotemaxioData, copyBioflagToTargets } from './opekepe_actions';
 import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR } from '../utils/api_helpers';
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
+import { copyPreviousYearOwnerships } from '../utils/router/ownership_try';
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
   const currentPath = window.location.hash;
@@ -96,6 +97,14 @@ async function handleShortcut(event: KeyboardEvent) {
       }
       break;
     }
+    case 'e':
+    case 'ε':
+      if (!appId) {
+        alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
+        break;
+      }
+      await copyPreviousYearOwnerships(appId);
+      break;
     case 'o': // Greek 'ο' might map to 'o'
     case 'ο':
       togglePersistentPopup();

@@ -51,6 +51,7 @@
     "computedWithControl": true,
     "controlledComputed": true,
     "controlledRef": true,
+    "copyPreviousYearOwnerships": true,
     "createApp": true,
     "createEventHook": true,
     "createGlobalState": true,
