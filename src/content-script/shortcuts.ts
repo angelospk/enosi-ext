@@ -14,7 +14,7 @@ async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Prom
     await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for navigation
   }
 
-  await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tabs to render
+  // await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tabs to render
 
   const tabElements = document.querySelectorAll<HTMLElement>('div.q-tab[role="tab"]');
   for (const tab of Array.from(tabElements)) {
@@ -41,10 +41,7 @@ async function handleShortcut(event: KeyboardEvent) {
   const appId = messageStore.currentApplicationId;
 
   switch (key) {
-    case '1':
-      await navigateToTab('Γενικά Στοιχεία Αιτούντα', `#/Edetedeaeehd?id=${appId}`);
-      // else alert("ID Αίτησης δεν έχει οριστεί.");
-      break;
+
     case '2':
       await navigateToTab('Συγκατάθεση GDPR', `#/Edetedeaeehd?id=${appId}`);
       // else alert("ID Αίτησης δεν έχει οριστεί.");
@@ -120,6 +117,56 @@ async function handleShortcut(event: KeyboardEvent) {
       }
       console.log('jsonInput', jsonInput);
       await handleMassUpdateFromJson(jsonInput, appId);
+      break;
+    }
+    case '1': {
+      // First, click the dropdown button to reveal the submenu
+      // if I am at https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd, just navigate on tab 'Γενικ΄α Στοιχεία Αιτούντα'
+      if (window.location.href.includes('#/Edetedeaeehd')) {
+        await navigateToTab('Γενικά Στοιχεία Αιτούντα', '#/Edetedeaeehd');
+        break;
+      }
+      // Find the dropdown button.
+      const dropdownButton = document.querySelector("button.q-btn-dropdown");
+      if (dropdownButton) {
+        console.log("Extension: Clicking dropdown button to reveal submenu.", dropdownButton);
+        (dropdownButton as HTMLButtonElement).click();
+        // Wait a bit for the submenu to render
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } else {
+        console.warn("Extension: Dropdown button not found.");
+        alert("Extension: Δεν βρέθηκε το κουμπί dropdown.");
+        break;
+      }
+      //loop that tries 5 times to find the 'Γενικά Στοιχεία' button with 50ms delay between each try
+      for (let i = 0; i < 5; i++) {
+        const buttons = document.querySelectorAll("button.btn_primary");
+        let targetButton: HTMLButtonElement | null = null;
+        for (const button of Array.from(buttons)) {
+          const span = button.querySelector("span.block");
+          if (span && span.textContent?.trim() === 'Γενικά Στοιχεία') { 
+            targetButton = button as HTMLButtonElement;
+            break;
+          }
+        }
+        if (targetButton) {
+          console.log(`Extension: Clicking 'Γενικά Στοιχεία' button:`, targetButton);
+          targetButton.click();
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Now, find and click the 'Γενικά Στοιχεία' button
+      const buttons = document.querySelectorAll("button.btn_primary");
+      let targetButton: HTMLButtonElement | null = null;
+      for (const button of Array.from(buttons)) {
+        const span = button.querySelector("span.block");
+        if (span && span.textContent?.trim() === 'Γενικά Στοιχεία') {
+          targetButton = button as HTMLButtonElement;
+          break;
+        }
+      }
       break;
     }
     default:
