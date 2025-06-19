@@ -34,18 +34,19 @@ function createPersistentIcon() {
 
   persistentIconElement = document.createElement('div');
   persistentIconElement.id = 'my-extension-persistent-icon';
-  persistentIconElement.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#333">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-      </svg>`;
+  //commented out svg icon for now
+  // persistentIconElement.innerHTML = `
+  //     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#333">
+  //         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+  //     </svg>`;
   const iconStyle = persistentIconElement.style;
   iconStyle.position = 'fixed';
-  iconStyle.bottom = '15px';
+  iconStyle.bottom = '0px';
   iconStyle.right = '15px';
-  iconStyle.width = '48px';
-  iconStyle.height = '48px';
+  iconStyle.width = '60px';
+  iconStyle.height = '24px';
   iconStyle.borderRadius = '50%';
-  iconStyle.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+  iconStyle.backgroundColor = '#f5f5f5';
   iconStyle.display = 'flex';
   iconStyle.alignItems = 'center';
   iconStyle.justifyContent = 'center';
@@ -71,8 +72,8 @@ function createPersistentIcon() {
   badgeStyle.position = 'absolute';
   badgeStyle.top = '0px';
   badgeStyle.right = '0px';
-  badgeStyle.background = 'red';
-  badgeStyle.color = 'white';
+  // badgeStyle.background = 'red';
+  badgeStyle.color = '#9e9e9e';
   badgeStyle.borderRadius = '10px';
   badgeStyle.padding = '1px 5px';
   badgeStyle.fontSize = '11px';
@@ -109,9 +110,11 @@ function createErrorNotificationSystem() {
  * Updates the badge on the persistent icon based on change counters.
  * @param counters - The change counters from the background state.
  */
-export function updateIconBadge(counters: BackgroundState['changeCounters']) {
+export function updateIconBadge(state: BackgroundState) {
   if (!iconBadgeElement) return;
-  const { newErrors, newWarnings, newInfos, removedMessages } = counters;
+  const { newErrors, newWarnings, newInfos, removedMessages } = state.changeCounters;
+  //number of messages in the state
+  const totalMessages = state.messages.length;
   const totalNew = newErrors + newWarnings + newInfos;
 
   if (totalNew > 0) {
@@ -119,16 +122,27 @@ export function updateIconBadge(counters: BackgroundState['changeCounters']) {
     iconBadgeElement.style.display = 'flex';
     iconBadgeElement.style.justifyContent = 'center';
     iconBadgeElement.style.alignItems = 'center';
-    if (newErrors > 0) iconBadgeElement.style.backgroundColor = 'red';
-    else if (newWarnings > 0) iconBadgeElement.style.backgroundColor = 'orange';
-    else iconBadgeElement.style.backgroundColor = 'dodgerblue';
-  } else if (removedMessages > 0 && totalNew === 0) {
-    iconBadgeElement.textContent = `-${removedMessages}`;
-    iconBadgeElement.style.backgroundColor = 'green';
-    iconBadgeElement.style.display = 'flex';
-  } else {
-    iconBadgeElement.style.display = 'none';
+    // add a + sign to the badge
+    iconBadgeElement.textContent = `+${totalNew}(${totalMessages})`;
+  //   if (newErrors > 0) iconBadgeElement.style.backgroundColor = 'red';
+  //   else if (newWarnings > 0) iconBadgeElement.style.backgroundColor = 'orange';
+  //   else iconBadgeElement.style.backgroundColor = 'dodgerblue';
+  // } else if (removedMessages > 0 && totalNew === 0) {
+  //   iconBadgeElement.textContent = `-${removedMessages}`;
+  //   iconBadgeElement.style.backgroundColor = 'green';
+  //   iconBadgeElement.style.display = 'flex';
+  // } else {
+  //   iconBadgeElement.style.display = 'none';
+  // }
   }
+  else if (removedMessages > 0) {
+    iconBadgeElement.textContent = `-${removedMessages}(${totalMessages})`;
+    iconBadgeElement.style.display = 'flex';
+    iconBadgeElement.style.justifyContent = 'center';
+    iconBadgeElement.style.alignItems = 'center';
+    // iconBadgeElement.style.backgroundColor = 'green';
+  }
+
 }
 
 /**

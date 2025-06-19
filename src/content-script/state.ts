@@ -24,7 +24,7 @@ async function requestInitialState() {
     const state = await sendMessage('get-bg-state', null) as unknown as BackgroundState;
     if (state) {
       messageStore.$patch(state);
-      updateIconBadge(state.changeCounters);
+      updateIconBadge(state);
       // Load the application ID needed for shortcuts
       // await optionsStore.applicationIdPromise;
       console.info("CS: Initial state loaded.");
@@ -46,7 +46,7 @@ function setupMessageListeners() {
     }
     console.info("CS: Received state update from background.", data);
     messageStore.$patch(data);
-    updateIconBadge(data.changeCounters);
+    updateIconBadge(data);
   });
 
   onMessage('show-error-notifications', ({ data }) => {
