@@ -2,10 +2,11 @@
 
 import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
-import { copyAgrotemaxioData, copyBioflagToTargets } from './opekepe_actions';
+import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './opekepe_actions';
 import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR } from '../utils/api_helpers';
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { copyPreviousYearOwnerships } from '../utils/router/ownership_try';
+import { findUnusedParcels } from '../utils/ownership_agroi';
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
   const currentPath = window.location.hash;
@@ -109,6 +110,14 @@ async function handleShortcut(event: KeyboardEvent) {
     case 'ο':
       togglePersistentPopup();
       break;
+    case 'q':{
+      const afm = await getAfmForApplication(appId || '');
+      if (afm) {
+        const unusedParcels = await findUnusedParcels(afm, appId || '');
+        console.log('unusedParcels', unusedParcels);
+      }
+      break;
+    }
     case 'μ':
     case 'm': {
       if (!appId) {

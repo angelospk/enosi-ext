@@ -78,6 +78,7 @@
     "extendRef": true,
     "extractShortcuts": true,
     "fetchApi": true,
+    "findUnusedParcels": true,
     "formBusInjectionKey": true,
     "formFieldInjectionKey": true,
     "formInputsInjectionKey": true,

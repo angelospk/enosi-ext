@@ -58,6 +58,7 @@ declare global {
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const extractShortcuts: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.js')['extractShortcuts']
   const fetchApi: typeof import('../utils/api_helpers')['fetchApi']
+  const findUnusedParcels: typeof import('../utils/ownership_agroi')['findUnusedParcels']
   const firebaseApp: typeof import('../utils/firebase')['firebaseApp']
   const firebaseConfig: typeof import('../utils/firebase')['firebaseConfig']
   const firestore: typeof import('../utils/firebase')['firestore']
@@ -483,6 +484,7 @@ declare module 'vue' {
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly extractShortcuts: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.js')['extractShortcuts']>
     readonly fetchApi: UnwrapRef<typeof import('../utils/api_helpers')['fetchApi']>
+    readonly findUnusedParcels: UnwrapRef<typeof import('../utils/ownership_agroi')['findUnusedParcels']>
     readonly formBusInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formBusInjectionKey']>
     readonly formFieldInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formFieldInjectionKey']>
     readonly formInputsInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formInputsInjectionKey']>

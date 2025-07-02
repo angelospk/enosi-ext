@@ -6,6 +6,26 @@ import {
 } from '../utils/api_helpers';
 
 /**
+     * Fetches the AFM for a given mainApplicationId.
+     * @param mainApplicationId - The main application ID (edeId).
+     * @returns {Promise<string|null>} The AFM if found, otherwise null.
+     */
+export async function getAfmForApplication(mainApplicationId: string): Promise<string | null> {
+    if (!mainApplicationId) {
+        alert("ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.");
+        return null;
+    }
+    try {
+        const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: mainApplicationId });
+        const currentEdehd = edehdResponse.data[0];
+        return currentEdehd?.afm ?? null;
+    } catch (e) {
+        console.error("Σφάλμα κατά την ανάκτηση του AFM:", e);
+        return null;
+    }
+}
+
+/**
  * Copies crop, cultivation, and eco-scheme data from a source parcel to multiple target parcels.
  * @param mainApplicationId - The main application ID (edeId).
  */
