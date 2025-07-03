@@ -187,6 +187,126 @@ async function handleShortcut(event: KeyboardEvent) {
       }
       break;
     }
+    case '`': {
+      // Ctrl + `
+      try {
+        const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ενοικιαστηρίων:');
+        if (!input) break;
+        let jsonInput;
+        try {
+          jsonInput = JSON.parse(input);
+        } catch (e) {
+          alert('Μη έγκυρο JSON.');
+          break;
+        }
+        const appId = messageStore.currentApplicationId;
+        if (!appId) {
+          alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
+          break;
+        }
+    
+        // 1. Φέρε όλα τα αγροτεμάχια
+        console.log("Fetching all agrotemaxia...");
+        const allAgrotemaxiaResponse = await fetchApi('Edetedeaeeagroi/findAllByCriteriaRange_EdetedeaeeagroiGrpEda', { g_Ede_id: appId, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 1000 });
+        const agrotemaxiaMap = new Map(allAgrotemaxiaResponse.data.map((agro: any) => [String(agro.kodikos), agro]));
+    
+        // 2. Βρες τα ενοικιαστήρια με λήξη 2024 ή αρχές 2025
+        const fields = jsonInput.field_list || [];
+        const newOwnerships = [];
+        for (const field of fields) {
+          const kodikos = String(field.code);
+          const properties = field.field_property_list || [];
+          for (const prop of properties) {
+            if (!prop.rental_end_date) continue;
+            const endDate = new Date(prop.rental_end_date);
+            if (
+              (endDate.getFullYear() === 2024) 
+              // (endDate.getFullYear() === 2025 && endDate.getMonth() < 4) // Ιαν-Φεβ-Μαρτ-Απρ - ΔΕΝ ΞΕΡΩ ΑΝ ΧΡΕΙΑΖΕΤΑΙ, ΓΙΑΤΙ ΑΝ ΕΙΝΑΙ ΤΟΥ 25 το ενοικ, δε διαγραφεται στη φτεινη αιτηση
+            ) {
+              // 3. Βρες το αγροτεμάχιο στη βάση
+              const agro = agrotemaxiaMap.get(kodikos);
+              if (!agro) {
+                console.warn(`Δεν βρέθηκε αγροτεμάχιο με kodikos ${kodikos}`);
+                continue;
+              }
+              // 4. Φέρε τις υπάρχουσες ιδιοκτησίες
+              let agroiemList = [];
+              try {
+                const resp = await fetchApi('Edetedeaeeagroiem/findAllByCriteriaRange_EdetedeaeeagroiGrpEam', {
+                  edaId_id: agro.id,
+                  gParams_yearEae: EAE_YEAR,
+                  fromRowIndex: 0,
+                  toRowIndex: 20,
+                  exc_Id: []
+                });
+                agroiemList = resp.data || [];
+              } catch (err) {
+                console.error('Σφάλμα στη λήψη ιδιοκτησιών:', err);
+                continue;
+              }
+              // 5. Πρόσθεσε νέα ιδιοκτησία με τα ίδια στοιχεία
+              const newOwnership = {
+                status: 0,
+                when: Date.now(),
+                entityName: "Edetedeaeeagroiem",
+                entity: {
+                  id: `TEMP_ID_${Math.random().toString(36).substr(2, 9)}`,
+                  afm: prop.tin,
+                  recordtype: 0,
+                  usrinsert: null,
+                  dteinsert: null,
+                  usrupdate: null,
+                  dteupdate: null,
+                  kodikos: field.code,
+                  remarks: null,
+                  afmidiokthth: prop.tin,
+                  nameidiokthth: prop.full_name,
+                  sexId: null,
+                  ebbId: null,
+                  aatemparastatiko: null,
+                  synidiopercent: prop.ownership_percent,
+                  iemtype: 2,
+                  rowVersion: null,
+                  atak: prop.atak,
+                  kaek: null,
+                  dteenoikstart: prop.rental_start_date,
+                  dteenoikend: prop.rental_end_date,
+                  symbarith: null,
+                  dtesymb: null,
+                  atakvalidflag: prop.is_atak_valid,
+                  eEnoikArith: null,
+                  eEnoikDte: null,
+                  ektashAtak: 1,
+                  etos: EAE_YEAR,
+                  edeId: { id: agro.edeId.id },
+                  edaId: { id: agro.id },
+                  etlId: { id: agro.etlId?.id },
+                  eatexId: null,
+                  edlId: null
+                }
+              };
+              newOwnerships.push(newOwnership);
+            }
+          }
+        }
+        if (newOwnerships.length === 0) {
+          alert('Δεν βρέθηκαν ενοικιαστήρια με λήξη 2024.');
+          break;
+        }
+        // 6. Αποθήκευση στη βάση
+        try {
+          await synchronizeChanges(newOwnerships);
+          alert(`Προστέθηκαν ${newOwnerships.length} νέες ιδιοκτησίες.`);
+        } catch (err) {
+          console.error('Σφάλμα στην αποθήκευση:', err);
+          alert('Σφάλμα στην αποθήκευση. Δες το console.');
+        }
+      } catch (err) {
+        console.error('Γενικό σφάλμα:', err);
+        alert('Γενικό σφάλμα. Δες το console.');
+      }
+      break;
+    }
     default:
       shortcutPerformed = false;
       break;
