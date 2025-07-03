@@ -278,9 +278,9 @@ async function handleShortcut(event: KeyboardEvent) {
                   eEnoikDte: null,
                   ektashAtak: 1,
                   etos: EAE_YEAR,
-                  edeId: { id: agro.edeId.id },
-                  edaId: { id: agro.id },
-                  etlId: { id: agro.etlId?.id },
+                  edeId: { id: appId },
+                  edaId: { id: agro?.id || null },
+                  etlId: { id: agro?.etlId?.id || null },
                   eatexId: null,
                   edlId: null
                 }
