@@ -3,7 +3,7 @@
 import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
 import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './opekepe_actions';
-import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR } from '../utils/api_helpers';
+import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } from '../utils/api_helpers';
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { copyPreviousYearOwnerships } from '../utils/router/ownership_try';
 import { findUnusedParcels } from '../utils/ownership_agroi';
@@ -269,8 +269,8 @@ async function handleShortcut(event: KeyboardEvent) {
                   rowVersion: null,
                   atak: prop.atak,
                   kaek: null,
-                  dteenoikstart: prop.rental_start_date,
-                  dteenoikend: prop.rental_end_date,
+                  dteenoikstart: toApiDateFormat(prop.rental_start_date),
+                  dteenoikend: toApiDateFormat(prop.rental_end_date),
                   symbarith: null,
                   dtesymb: null,
                   atakvalidflag: prop.is_atak_valid,

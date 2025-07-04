@@ -149,3 +149,18 @@ export const executeSync = async (changes: any[], mainApplicationId: string): Pr
 
     return synchronizeChanges(finalChanges);
 }; 
+
+export function toApiDateFormat(dateStr: string | null): string | null {
+    if (!dateStr) return null;
+    // Parse as local time
+    const [datePart, timePart] = dateStr.split(' ');
+    if (!datePart || !timePart) return null;
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute, second] = timePart.split(':').map(Number);
+    // Create Date object in local time
+    const date = new Date(year, month - 1, day, hour, minute, second);
+    // Subtract 2 hours
+    date.setHours(date.getHours() - 2);
+    // Return as ISO string in UTC
+    return date.toISOString();
+  }

@@ -171,6 +171,7 @@
     "templateRef": true,
     "throttledRef": true,
     "throttledWatch": true,
+    "toApiDateFormat": true,
     "toRaw": true,
     "toReactive": true,
     "toRef": true,
