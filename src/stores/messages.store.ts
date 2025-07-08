@@ -123,7 +123,6 @@ export const useMessageStore = defineStore('messages', () => {
         existingMessage.rawText = rawText;
         existingMessage.cleanedText = cleanedText;
         existingMessage.type = categorizeMessage(rawText);
-        existingMessage.isDismissedOnce = false;
         newProcessedMessages.push(existingMessage);
       } else {
         // This is a brand new message
