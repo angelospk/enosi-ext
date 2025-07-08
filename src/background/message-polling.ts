@@ -1,6 +1,5 @@
 // src/background/message-polling.ts
-import { messageStore } from './state';
-import { pollingEnabled, pollingIntervalMs } from './settings';
+import { messageStore, settingsStore } from './state';
 import { fetchLastYearsData } from  './last-year-data'
 
 // --- Module State ---
@@ -81,9 +80,9 @@ function stopPolling(): void {
  */
 function startPolling(): void {
   stopPolling(); // Ensure no multiple intervals are running
-  if (pollingEnabled && currentAppId) {
-    pollingIntervalId = self.setInterval(pollMessages, pollingIntervalMs);
-    console.info(`BG-Polling: Polling started with interval ${pollingIntervalMs}ms for app: ${currentAppId}`);
+  if (settingsStore.pollingEnabled && currentAppId) {
+    pollingIntervalId = self.setInterval(pollMessages, settingsStore.pollingInterval);
+    console.info(`BG-Polling: Polling started with interval ${settingsStore.pollingInterval}ms for app: ${currentAppId}`);
   } else {
     console.info("BG-Polling: Conditions not met for starting poll timer (polling disabled or no AppID).");
   }
@@ -96,7 +95,7 @@ function startPolling(): void {
  */
 export async function updatePollingState(newAppId: string | null, tabId: number): Promise<void> {
   // If the App ID is new, update everything
-  if (newAppId && newAppId !== currentAppId) {
+  if (newAppId && newAppId !== messageStore.currentApplicationId) {
     console.log(`BG-Polling: New application ID detected: '${newAppId}'. Updating state.`);
     messageStore.clearApplicationId();
     currentAppId = newAppId;

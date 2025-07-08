@@ -2,8 +2,8 @@
 
 import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
-import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './opekepe_actions';
-import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } from '../utils/api_helpers';
+import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './agro-actions';
+import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } from '../utils/api';
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { copyPreviousYearOwnerships } from '../utils/router/ownership_try';
 import { findUnusedParcels } from '../utils/ownership_agroi';

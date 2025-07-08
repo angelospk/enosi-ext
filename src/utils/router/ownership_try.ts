@@ -1,6 +1,6 @@
 // src/utils/ownershipCopier.ts
 
-import { EAE_YEAR, fetchApi, executeSync } from '../api_helpers';
+import { EAE_YEAR, fetchApi, executeSync } from '../api';
 
 // Interface για τις παραμέτρους του ΚΕΑ για καλύτερη οργάνωση
 interface KeaParams {

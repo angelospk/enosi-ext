@@ -3,7 +3,7 @@ import {
     synchronizeChanges,
     executeSync,
     EAE_YEAR
-} from '../utils/api_helpers';
+} from '../utils/api';
 
 /**
      * Fetches the AFM for a given mainApplicationId.

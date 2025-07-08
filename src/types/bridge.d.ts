@@ -1,4 +1,3 @@
-// src/types/bridge.d.ts
 import type { ProcessedMessage } from '../stores/messages.store';
 import type { SearchableItem } from '../stores/search.store';
 
@@ -25,30 +24,6 @@ export interface BackgroundState {
     newInfos: number;
     removedMessages: number;
   };
-}
-
-export interface MessagePayloads {
-  'get-initial-state': void;
-  'dismiss-message-once': { messageId: string };
-  'dismiss-message-permanently': { messageId: string };
-  'clear-change-counters': void;
-  'popup-visibility-changed': { visible: boolean };
-  'url-changed-for-id-check': { url: string }; // Νέο μήνυμα από το content script
-  // Search related
-  'get-search-suggestions': { searchTerm: string };
-  'item-selected': Omit<SearchableItem, 'selection_count'>;
-}
-
-export interface BackgroundResponsePayloads {
-  'get-initial-state': BackgroundState;
-  'get-search-suggestions': SearchableItem[];
-  'get-last-year-data': { data: LastYearData | null, error?: string };
-}
-
-export interface BackgroundEvents {
-  'state-updated': BackgroundState;
-  'show-error-notifications': Array<{ id: string, text: string }>;
-  'last-year-data-updated': { data: LastYearData | null, error?: string };
 }
 
 // Για το setup του webext-bridge
