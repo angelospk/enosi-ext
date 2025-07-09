@@ -31,7 +31,7 @@
         >
           Μηνύματα ({{ messageStore.visibleMessages.length }})
         </button>
-        <button
+        <!-- <button
           :class="{ active: activeTab === 'lastYear' }"
           @click="activeTab = 'lastYear'"
         >
@@ -52,6 +52,12 @@
           title="Σύντομα διαθέσιμο"
         >
           AFM
+        </button> -->
+        <button
+          :class="{ active: activeTab === 'kea' }"
+          @click="activeTab = 'kea'"
+        >
+          KEA
         </button>
         <button
           :class="{ active: activeTab === 'settings' }"
@@ -95,6 +101,37 @@
         <div class="placeholder-pane">
           <h4>Διαχείριση Λεξικού ΑΦΜ</h4>
           <p>Αυτή η λειτουργία θα είναι σύντομα διαθέσιμη.</p>
+        </div>
+      </template>
+
+      <!-- KEA Settings Tab -->
+      <template v-if="activeTab === 'kea'">
+        <div class="settings-pane">
+          <h4>Ρυθμίσεις ΚΕΑ</h4>
+          <div class="setting-item-vertical">
+            <label for="gUserType">gUserType:</label>
+            <input
+              id="gUserType"
+              v-model="keaStore.keaParams.gUserType"
+              type="text"
+            />
+          </div>
+          <div class="setting-item-vertical">
+            <label for="globalUserVat">globalUserVat:</label>
+            <input
+              id="globalUserVat"
+              v-model="keaStore.keaParams.globalUserVat"
+              type="text"
+            />
+          </div>
+          <div class="setting-item-vertical">
+            <label for="e_bi_gSubExt_id">e_bi_gSubExt_id:</label>
+            <input
+              id="e_bi_gSubExt_id"
+              v-model="keaStore.keaParams.e_bi_gSubExt_id"
+              type="text"
+            />
+          </div>
         </div>
       </template>
 
@@ -162,6 +199,7 @@ import MessagesDisplay from './MessagesDisplay.vue';
 import LastYearDataCard from './LastYearDataCard.vue';
 import { useMessageStore } from '../stores/messages.store';
 import { useSettingsStore } from '../stores/settings.store'; // Νέα εισαγωγή
+import { useKeaStore } from '../stores/kea.store';
 import { sendMessage, onMessage } from 'webext-bridge/content-script';
 
 interface PopupState {
@@ -173,11 +211,12 @@ interface PopupState {
 
 // --- State για την κατάσταση του Component ---
 const isVisible = ref(false);
-const activeTab = ref<'messages' | 'settings' | 'lastYear' | 'totals' | 'afm'>('messages');
+const activeTab = ref<'messages' | 'settings' | 'lastYear' | 'totals' | 'afm' | 'kea'>('messages');
 
 // --- Pinia Stores ---
 const messageStore = useMessageStore();
 const settingsStore = useSettingsStore();
+const keaStore = useKeaStore();
 
 // Listen for application ID changes from the background script and update the message store
 onMessage('application-id-changed', (message) => {

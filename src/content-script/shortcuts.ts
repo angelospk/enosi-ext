@@ -1,5 +1,6 @@
 // content-scripts/shortcuts.ts
 
+import { useKeaStore } from '../stores/kea.store';
 import { messageStore } from './state';
 import { toggleUIVisibility, togglePersistentPopup } from './ui';
 import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './agro-actions';
@@ -124,7 +125,8 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
         break;
       }
-      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική ενημέρωση:');
+      try {
+              const input = prompt('Επικόλλησε το JSON εισόδου για μαζική ενημέρωση:');
       if (!input) break;
       let jsonInput;
       try {
@@ -135,6 +137,32 @@ async function handleShortcut(event: KeyboardEvent) {
       }
       console.log('jsonInput', jsonInput);
       await handleMassUpdateFromJson(jsonInput, appId);
+        await fetchApi('MainService/fetchOwnerAtakInfoFromAade?', { edeId: appId, forceUpdate: true, etos: EAE_YEAR });
+        const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
+        const afm = edehdResponse.data[0].afm;
+        const keaStore = useKeaStore();
+        const prevYearEdeResponse = await fetchApi('MainService/getEdesByAfm?', { str_afm: afm, str_UserType: keaStore.keaParams.gUserType, globalUserVat: keaStore.keaParams.globalUserVat, e_bi_gSubExt_id: keaStore.keaParams.e_bi_gSubExt_id, i_etos: EAE_YEAR - 1 });
+        const prevYearEdeId = prevYearEdeResponse.data[0].id;
+        const reportResponse = await fetchApi('Reports/ReportsBtnFrm_RepEdeCsBtn_action', { reportFormat: 1, BD_EDE_ID: prevYearEdeId, I_ETOS: EAE_YEAR - 1 });
+        const base64String = reportResponse.data;
+        const rawBinaryString = atob(base64String);
+        const len = rawBinaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = rawBinaryString.charCodeAt(i);
+        }
+        const fileBlob = new Blob([bytes], { type: 'application/json' });
+        const downloadUrl = window.URL.createObjectURL(fileBlob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `${afm}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      } catch (error) {
+        alert(`Προέκυψε σφάλμα: ${(error as Error).message}`);
+      }
       break;
     }
     case '1': {

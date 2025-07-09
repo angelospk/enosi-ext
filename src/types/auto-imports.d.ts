@@ -242,6 +242,7 @@ declare global {
   const useInterval: typeof import('@vueuse/core')['useInterval']
   const useIntervalFn: typeof import('@vueuse/core')['useIntervalFn']
   const useKbd: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useKbd.js')['useKbd']
+  const useKeaStore: typeof import('../stores/kea.store')['useKeaStore']
   const useKeyModifier: typeof import('@vueuse/core')['useKeyModifier']
   const useLastChanged: typeof import('@vueuse/core')['useLastChanged']
   const useLastYearDataStore: typeof import('../stores/lastYearData.store')['useLastYearDataStore']
@@ -637,6 +638,7 @@ declare module 'vue' {
     readonly useInterval: UnwrapRef<typeof import('@vueuse/core')['useInterval']>
     readonly useIntervalFn: UnwrapRef<typeof import('@vueuse/core')['useIntervalFn']>
     readonly useKbd: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useKbd.js')['useKbd']>
+    readonly useKeaStore: UnwrapRef<typeof import('../stores/kea.store')['useKeaStore']>
     readonly useKeyModifier: UnwrapRef<typeof import('@vueuse/core')['useKeyModifier']>
     readonly useLastChanged: UnwrapRef<typeof import('@vueuse/core')['useLastChanged']>
     readonly useLastYearDataStore: UnwrapRef<typeof import('../stores/lastYearData.store')['useLastYearDataStore']>

@@ -270,6 +270,7 @@
     "useInterval": true,
     "useIntervalFn": true,
     "useKbd": true,
+    "useKeaStore": true,
     "useKeyModifier": true,
     "useLastChanged": true,
     "useLastYearDataStore": true,
