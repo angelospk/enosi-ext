@@ -1,5 +1,6 @@
 // content-scripts/ui.ts
 
+import ShortcutsModal from '../components/ShortcutsModal.vue';
 import { createApp, ComponentPublicInstance, App as VueApp } from 'vue';
 import PersistentIconPopup from '../components/PersistentIconPopup.vue';
 import ErrorNotification from '../components/ErrorNotification.vue';
@@ -15,15 +16,16 @@ type PersistentIconPopupInstance = ComponentPublicInstance & {
   hide: () => void;
 };
 
-type ErrorNotificationInstance = ComponentPublicInstance & {
-  showErrorNotifications: (messages: ProcessedMessage[]) => void;
+type ShortcutsModalInstance = ComponentPublicInstance & {
+  open: () => void;
+  close: () => void;
 };
 
 // --- Module-level variables for UI elements ---
 let persistentIconElement: HTMLElement | null = null;
 let iconBadgeElement: HTMLSpanElement | null = null;
 let persistentIconPopupVm: PersistentIconPopupInstance | null = null;
-let errorNotificationVm: ErrorNotificationInstance | null = null;
+let shortcutsModalVm: ShortcutsModalInstance | null = null;
 
 // --- State for UI visibility ---
 let isUIVisible = true;
@@ -95,15 +97,14 @@ function createPersistentIcon() {
   persistentIconPopupVm = app.mount(popupContainer) as PersistentIconPopupInstance;
 }
 
-function createErrorNotificationSystem() {
-  if (document.getElementById('my-extension-error-notification-root')) return;
+function createShortcutsModal() {
+  if (document.getElementById('shortcuts-modal-root')) return;
   const container = document.createElement('div');
-  container.id = 'my-extension-error-notification-root';
+  container.id = 'shortcuts-modal-root';
   document.body.appendChild(container);
 
-  const app = createApp(ErrorNotification);
-  // This component doesn't need Pinia directly, it's controlled via methods
-  errorNotificationVm = app.mount(container) as ErrorNotificationInstance;
+  const app = createApp(ShortcutsModal);
+  shortcutsModalVm = app.mount(container) as ShortcutsModalInstance;
 }
 
 /**
@@ -150,7 +151,7 @@ export function updateIconBadge(state: BackgroundState) {
  * @param messages - An array of messages to display.
  */
 export function showErrorNotifications(messages: ProcessedMessage[]) {
-  errorNotificationVm?.showErrorNotifications(messages);
+  ErrorNotification?.showErrorNotifications(messages);
 }
 
 /**
@@ -174,6 +175,9 @@ export function toggleUIVisibility() {
 /**
  * Toggles the main persistent popup.
  */
+export function toggleShortcutsModal() {
+    shortcutsModalVm?.open();
+}
 export function togglePersistentPopup() {
     persistentIconPopupVm?.toggleVisibility();
 }
@@ -183,5 +187,6 @@ export function togglePersistentPopup() {
  */
 export function initializeUI() {
   createPersistentIcon();
-  createErrorNotificationSystem();
+  // createErrorNotificationSystem();
+  createShortcutsModal();
 }

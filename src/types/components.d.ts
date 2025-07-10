@@ -20,6 +20,7 @@ declare module 'vue' {
     RouterLinkUp: typeof import('./../components/RouterLinkUp.vue')['default']
     RouterView: typeof import('vue-router')['RouterView']
     SearchPopup: typeof import('./../components/SearchPopup.vue')['default']
+    ShortcutsModal: typeof import('./../components/ShortcutsModal.vue')['default']
     TailwindEmptyState: typeof import('./../components/state/tailwind-empty-state.vue')['default']
     ThemeSwitch: typeof import('./../components/ThemeSwitch.vue')['default']
     UApp: typeof import('./../../node_modules/@nuxt/ui/dist/runtime/components/App.vue')['default']

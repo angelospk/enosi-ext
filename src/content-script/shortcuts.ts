@@ -2,7 +2,7 @@
 
 import { useKeaStore } from '../stores/kea.store';
 import { messageStore } from './state';
-import { toggleUIVisibility, togglePersistentPopup } from './ui';
+import { toggleUIVisibility, toggleShortcutsModal, togglePersistentPopup } from './ui';
 import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './agro-actions';
 import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } from '../utils/api';
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
@@ -37,6 +37,10 @@ async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Prom
 
 
 async function handleShortcut(event: KeyboardEvent) {
+    if (event.ctrlKey && event.key === '/') {
+      toggleShortcutsModal();
+      return;
+    }
   if (!event.ctrlKey) return;
 
   let shortcutPerformed = true;

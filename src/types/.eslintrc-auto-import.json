@@ -44,6 +44,7 @@
     "avatarGroupInjectionKey": true,
     "browser": true,
     "buttonGroupInjectionKey": true,
+    "cleanGeospatialData": true,
     "computed": true,
     "computedAsync": true,
     "computedEager": true,
