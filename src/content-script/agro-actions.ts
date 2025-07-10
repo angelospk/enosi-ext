@@ -99,13 +99,24 @@ export async function copyAgrotemaxioData(mainApplicationId: string) {
                 if (sourceFytiko) {
                     console.log(`Processing Kalliergia/Syndedemeni for target ${targetKodikos}...`);
                     const targetFytikoResponse = await fetchApi('Edetedeaeefytiko/findAllByCriteriaRange_EdetedeaeeagroiGrpEdf', { edaId_id: targetAgrotemaxio.id, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 10 });
-                    const targetFytiko = (targetFytikoResponse.data && targetFytikoResponse.data.length > 0) ? targetFytikoResponse.data[0] : null;
+                    const targetFytikoEntries = targetFytikoResponse.data || [];
 
-                    if (targetFytiko) {
+                    if (targetFytikoEntries.length > 0) {
                         const changes = [];
+                        const firstFytiko = targetFytikoEntries[0];
+
+                        // Delete all fytiko entries except the first one
+                        for (let i = 1; i < targetFytikoEntries.length; i++) {
+                            changes.push({
+                                status: 2, // Delete
+                                when: Date.now(),
+                                entityName: "Edetedeaeefytiko",
+                                entity: { id: targetFytikoEntries[i].id, rowVersion: targetFytikoEntries[i].rowVersion }
+                            });
+                        }
 
                         // ΒΗΜΑ 5.1: Έλεγχος και προετοιμασία διαγραφής παλιάς συνδεδεμένης του TARGET
-                        const targetSyndedemenes = await fetchApi('Edetedeaeerequestfytiko/findAllByCriteriaRange_EdetedeaeeagroiGrpEfrq', { edfId_id: targetFytiko.id, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 10 });
+                        const targetSyndedemenes = await fetchApi('Edetedeaeerequestfytiko/findAllByCriteriaRange_EdetedeaeeagroiGrpEfrq', { edfId_id: firstFytiko.id, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 10 });
                         if (targetSyndedemenes.data && targetSyndedemenes.data.length > 0) {
                             console.log(`Target ${targetKodikos} has existing syndedemenes. They will be deleted.`);
                             for (const synd of targetSyndedemenes.data) {
@@ -120,12 +131,14 @@ export async function copyAgrotemaxioData(mainApplicationId: string) {
 
                         // ΒΗΜΑ 5.2: Προετοιμασία Ανανέωσης του Φυτικού Κεφαλαίου του TARGET
                         const updatedFytikoEntity = {
-                            ...targetFytiko,
-                                      efyId: { id: sourceFytiko.efyId.id },
-        poiId: { id: sourceFytiko.poiId.id },
-        emxpId: sourceFytiko.emxpId ? { id: sourceFytiko.emxpId.id } : null,
-        emccId: sourceFytiko.emccId ? { id: sourceFytiko.emccId.id } : null,
-        efecId: sourceFytiko.efecId ? { id: sourceFytiko.efecId.id } : null,
+                            ...firstFytiko,
+                            epilektash: targetAgrotemaxio.da100,
+                            epilektash100: targetAgrotemaxio.da100,
+                            efyId: { id: sourceFytiko.efyId.id },
+                            poiId: { id: sourceFytiko.poiId.id },
+                            emxpId: sourceFytiko.emxpId ? { id: sourceFytiko.emxpId.id } : null,
+                            emccId: sourceFytiko.emccId ? { id: sourceFytiko.emccId.id } : null,
+                            efecId: sourceFytiko.efecId ? { id: sourceFytiko.efecId.id } : null,
                         };
                         changes.push({
                             status: 1, // Update
@@ -148,7 +161,7 @@ export async function copyAgrotemaxioData(mainApplicationId: string) {
                                 etos: EAE_YEAR,
                                 edeId: { id: mainApplicationId },
                                 edaId: { id: targetAgrotemaxio.id },
-                                edfId: { id: targetFytiko.id }, // Σύνδεση με το fytiko του target
+                                edfId: { id: firstFytiko.id }, // Σύνδεση με το fytiko του target
                                 efyId: { id: sourceFytiko.efyId.id },
                                 poiId: { id: sourceFytiko.poiId.id },
                                 eschId: { id: sourceSyndedemeni.eschId.id },
