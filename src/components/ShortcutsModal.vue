@@ -1,25 +1,24 @@
 <template>
   <div v-if="isVisible" class="shortcuts-modal-overlay" @click.self="close">
     <div class="shortcuts-modal-content">
-      <h3> συντομεύσεις πληκτρολογίου</h3>
+      <h3> Συντομεύσεις πληκτρολογίου</h3>
       <ul>
-        <li><strong>Ctrl + 1:</strong> Γενικά Στοιχεία Αιτούντα</li>
-        <li><strong>Ctrl + 2:</strong> Συγκατάθεση GDPR</li>
-        <li><strong>Ctrl + 3:</strong> Μεταβιβάσεις</li>
+        <li><strong>Ctrl + 1:</strong> Γενικά Στοιχεία  (ξανά: Γενικά Στοιχεία Αιτούντα)</li>
+        <li><strong>Ctrl + 2:</strong> Γενικά Στοιχεία: Συγκατάθεση GDPR</li>
+        <li><strong>Ctrl + 3:</strong> Επιχειρήσεις Βιοκαυσίμων</li>
         <li><strong>Ctrl + 4:</strong> Αγροτεμάχια</li>
-        <li><strong>Ctrl + 5:</strong> Ιδιοκτησία</li>
-        <li><strong>Ctrl + 6:</strong> Οικολογικά Σχήματα</li>
-        <li><strong>Ctrl + 7:</strong> Φυτικό Κεφάλαιο</li>
-        <li><strong>Ctrl + 9:</strong> Δικαιούχος</li>
+        <li><strong>Ctrl + 5:</strong> Έλεγχος Λαθών</li>
+        <li><strong>Ctrl + 6:</strong> Δικαιολογητικά</li>
+    
         <li><strong>Ctrl + 0:</strong> Απόκρυψη/Εμφάνιση UI</li>
         <li><strong>Ctrl + I:</strong> Αντιγραφή Καλλιεργειών & Οικολογικών Σχημάτων</li>
-        <li><strong>Ctrl + B:</strong> Αντιγραφή Bioflag</li>
+        <li><strong>Ctrl + B:</strong> Αντιγραφή Bioflag (Τήρηση)</li>
         <li><strong>Ctrl + S:</strong> Αποθήκευση</li>
-        <li><strong>Ctrl + E:</strong> Αντιγραφή Ιδιοκτησίας Προηγούμενου Έτους</li>
+        <!-- <li><strong>Ctrl + E:</strong> Αντιγραφή Ιδιοκτησίας Προηγούμενου Έτους</li> -->
         <li><strong>Ctrl + O:</strong> Εμφάνιση/Απόκρυψη παραθύρου</li>
-        <li><strong>Ctrl + Q:</strong> Εύρεση αχρησιμοποίητων αγροτεμαχίων</li>
-        <li><strong>Ctrl + M:</strong> Λήψη Συγκεντρωτικών Στοιχείων</li>
-        <li><strong>Ctrl + `:</strong> Μαζική αντιγραφή ενοικιαστηρίων</li>
+        <li><strong>Ctrl + Q:</strong> Εύρεση αχρησιμοποίητων ιδιόκτητων αγροτεμαχίων (κονσόλα)</li> 
+        <li><strong>Ctrl + M:</strong> Λήψη Περσινών Συγκεντρωτικών Στοιχείων (χωρίς γεωγραφικά δεδομένα)</li>
+        <!-- <li><strong>Ctrl + `:</strong> Μαζική αντιγραφή ενοικιαστηρίων</li> -->
         <li><strong>Shift + ?:</strong> Εμφάνιση συντομεύσεων</li>
       </ul>
       <button @click="close">Κλείσιμο</button>

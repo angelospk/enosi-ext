@@ -156,7 +156,11 @@ async function handleShortcut(event: KeyboardEvent) {
             bytes[i] = rawBinaryString.charCodeAt(i);
         }
         const fileBlob = new Blob([bytes], { type: 'application/json' });
-        const downloadUrl = window.URL.createObjectURL(fileBlob);
+        const jsonData = JSON.parse(await fileBlob.text());
+        const cleanedData = cleanGeospatialData(jsonData);
+        
+        const cleanedFileBlob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
+        const downloadUrl = window.URL.createObjectURL(cleanedFileBlob);
         const link = document.createElement('a');
         link.href = downloadUrl;
         link.download = `${afm}.json`;
