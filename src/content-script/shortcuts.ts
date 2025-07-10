@@ -185,8 +185,19 @@ async function handleShortcut(event: KeyboardEvent) {
         break;
       }
       try {
-              const input = prompt('Επικόλλησε το JSON εισόδου για μαζική ενημέρωση:');
-      if (!input) break;
+      let input = prompt('Επικόλλησε το JSON εισόδου για μαζική ενημέρωση:');
+      if (!input) {input=JSON.stringify({
+  "akrofysia": false,
+  "exisotiki": false,
+  "hlianthos_sumbasi": false,
+  "lipasmata": false,
+  "malakos_sitos": false,
+  "skliros_sitos": false,
+  "vamvaki": false,
+  "viologiko": false,
+  "timologia": []
+},null,2);
+      }
       let jsonInput;
       try {
         jsonInput = JSON.parse(input);
