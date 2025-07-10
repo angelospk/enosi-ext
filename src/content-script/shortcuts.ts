@@ -36,9 +36,11 @@ async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Prom
 
 
 
-async function handleShortcut(event: KeyboardEvent) {
-    if (event.ctrlKey && event.key === '/') {
-      toggleShortcutsModal();
+async function handleShortcut(event: KeyboardEvent) { 
+  if (event.ctrlKey && event.key === '/') {
+      event.preventDefault();
+    event.stopPropagation();   
+    toggleShortcutsModal();
       return;
     }
   if (!event.ctrlKey) return;
@@ -50,16 +52,24 @@ async function handleShortcut(event: KeyboardEvent) {
   switch (key) {
 
     case '2':
+  event.preventDefault();
+  event.stopPropagation(); 
       await navigateToTab('Συγκατάθεση GDPR', `#/Edetedeaeehd?id=${appId}`);
       // else alert("ID Αίτησης δεν έχει οριστεί.");
       break;
     case '3':
+      event.preventDefault();
+  event.stopPropagation(); 
       window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeemetcom';
       break;
     case '4':
+      event.preventDefault();
+  event.stopPropagation(); 
       window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeeagroi';
       break;
     case '5':{
+      event.preventDefault();
+  event.stopPropagation(); 
       // await navigateToTab('Ιδιοκτησία', '#/Edetedeaeeagroi');
       // Find the dropdown button.
       const dropdownButton = document.querySelector("button.q-btn-dropdown");
@@ -105,6 +115,8 @@ async function handleShortcut(event: KeyboardEvent) {
       break
     }
     case '6':
+      event.preventDefault();
+  event.stopPropagation(); 
       window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeedikaiol';
       break;
     // case '7':
@@ -154,6 +166,8 @@ async function handleShortcut(event: KeyboardEvent) {
       break;
     case 'o': // Greek 'ο' might map to 'o'
     case 'ο':
+      event.preventDefault();
+  event.stopPropagation(); 
       togglePersistentPopup();
       break;
     case 'q':{
@@ -215,6 +229,8 @@ async function handleShortcut(event: KeyboardEvent) {
       break;
     }
     case '1': {
+      event.preventDefault();
+  event.stopPropagation(); 
       // First, click the dropdown button to reveal the submenu
       // if I am at https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeehd, just navigate on tab 'Γενικ΄α Στοιχεία Αιτούντα'
       if (window.location.href.includes('#/Edetedeaeehd')) {

@@ -333,6 +333,7 @@ declare global {
   const useToString: typeof import('@vueuse/core')['useToString']
   const useToast: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useToast.js')['useToast']
   const useToggle: typeof import('@vueuse/core')['useToggle']
+  const useTotalsStore: typeof import('../stores/totals.store')['useTotalsStore']
   const useTransition: typeof import('@vueuse/core')['useTransition']
   const useUrlSearchParams: typeof import('@vueuse/core')['useUrlSearchParams']
   const useUserMedia: typeof import('@vueuse/core')['useUserMedia']
@@ -379,6 +380,9 @@ declare global {
   // @ts-ignore
   export type { DataCategoryCode, SearchableItem, RecentItem, AfmItem, AllData } from '../stores/search.store'
   import('../stores/search.store')
+  // @ts-ignore
+  export type { SporosData } from '../stores/totals.store'
+  import('../stores/totals.store')
   // @ts-ignore
   export type { MockExtensionSettings, MockKnowledgeItem } from '../utils/mockData'
   import('../utils/mockData')
@@ -730,6 +734,7 @@ declare module 'vue' {
     readonly useToString: UnwrapRef<typeof import('@vueuse/core')['useToString']>
     readonly useToast: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useToast.js')['useToast']>
     readonly useToggle: UnwrapRef<typeof import('@vueuse/core')['useToggle']>
+    readonly useTotalsStore: UnwrapRef<typeof import('../stores/totals.store')['useTotalsStore']>
     readonly useTransition: UnwrapRef<typeof import('@vueuse/core')['useTransition']>
     readonly useUrlSearchParams: UnwrapRef<typeof import('@vueuse/core')['useUrlSearchParams']>
     readonly useUserMedia: UnwrapRef<typeof import('@vueuse/core')['useUserMedia']>

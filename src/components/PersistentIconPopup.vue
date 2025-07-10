@@ -38,14 +38,6 @@
           Περσινά
         </button>
         <button
-          :class="{ active: activeTab === 'totals' }"
-          @click="activeTab = 'totals'"
-          disabled
-          title="Σύντομα διαθέσιμο"
-        >
-          Συνολικά
-        </button>
-        <button
           :class="{ active: activeTab === 'afm' }"
           @click="activeTab = 'afm'"
           disabled
@@ -53,11 +45,17 @@
         >
           AFM
         </button> -->
-        <button
+        <!-- <button
           :class="{ active: activeTab === 'kea' }"
           @click="activeTab = 'kea'"
         >
           KEA
+        </button> -->
+        <button
+          :class="{ active: activeTab === 'totals' }"
+          @click="activeTab = 'totals'"
+        >
+          Συνολικά
         </button>
         <button
           :class="{ active: activeTab === 'settings' }"
@@ -90,9 +88,26 @@
 
       <!-- Placeholder for Totals Tab -->
       <template v-if="activeTab === 'totals'">
-        <div class="placeholder-pane">
-          <h4>Συνολικά Στοιχεία Αίτησης</h4>
-          <p>Αυτή η λειτουργία θα είναι σύντομα διαθέσιμη.</p>
+        <div class="totals-pane">
+          <div class="totals-header">
+            <!-- <h4>Συνολικά Στοιχεία Σπόρων</h4> -->
+            <button @click="totalsStore.fetchTotals" :disabled="totalsStore.isLoading">
+              {{ totalsStore.isLoading ? 'Ανανέωση...' : 'Ανανέωση' }}
+            </button>
+          </div>
+          <div v-if="totalsStore.isLoading" class="loading-state">Φόρτωση...</div>
+          <div v-else-if="totalsStore.error" class="error-state">{{ totalsStore.error }}</div>
+          <div v-else-if="totalsStore.data.length > 0" class="totals-list">
+            <div v-for="item in totalsStore.data" :key="item.viewKey" class="total-item">
+              <p><strong>{{ item.poiDescription }}</strong></p>
+              <p>Απαιτούμενος kg: {{ item.sporosqtyRequired }}</p>
+              <p>Δηλωμένος kg: {{ item.sporosqty }}</p>
+              <p :class="{ 'negative-diff': (item.sporosqty - item.sporosqtyRequired) / item.minSporosqtyAnaHa < 0 }">
+                Διαφορά Ha: {{ ((item.sporosqty - item.sporosqtyRequired) / item.minSporosqtyAnaHa).toFixed(3) }}
+              </p>
+            </div>
+          </div>
+          <div v-else class="no-data-state">Δεν βρέθηκαν δεδομένα.</div>
         </div>
       </template>
 
@@ -104,41 +119,11 @@
         </div>
       </template>
 
-      <!-- KEA Settings Tab -->
-      <template v-if="activeTab === 'kea'">
-        <div class="settings-pane">
-          <h4>Ρυθμίσεις ΚΕΑ</h4>
-          <div class="setting-item-vertical">
-            <label for="gUserType">gUserType:</label>
-            <input
-              id="gUserType"
-              v-model="keaStore.keaParams.gUserType"
-              type="text"
-            />
-          </div>
-          <div class="setting-item-vertical">
-            <label for="globalUserVat">globalUserVat:</label>
-            <input
-              id="globalUserVat"
-              v-model="keaStore.keaParams.globalUserVat"
-              type="text"
-            />
-          </div>
-          <div class="setting-item-vertical">
-            <label for="e_bi_gSubExt_id">e_bi_gSubExt_id:</label>
-            <input
-              id="e_bi_gSubExt_id"
-              v-model="keaStore.keaParams.e_bi_gSubExt_id"
-              type="text"
-            />
-          </div>
-        </div>
-      </template>
 
       <!-- Περιεχόμενο για την καρτέλα "Ρυθμίσεις" -->
       <template v-if="activeTab === 'settings'">
         <div class="settings-pane">
-          <h4>Ρυθμίσεις Polling</h4>
+          <h4>Ρυθμίσεις Polling μηνυμάτων</h4>
           <div class="setting-item">
             <label>
               <input
@@ -172,6 +157,33 @@
             </label>
             <small>Όλα τα "αγνοημένα για πάντα" μηνύματα θα εμφανιστούν ξανά όταν επιλέξετε διαφορετική αίτηση.</small>
           </div>
+          <div class="settings-pane">
+            <h4>Ρυθμίσεις ΚΕΑ</h4>
+            <div class="setting-item-vertical">
+              <label for="gUserType">gUserType:</label>
+              <input
+                id="gUserType"
+                v-model="keaStore.keaParams.gUserType"
+                type="text"
+              />
+            </div>
+            <div class="setting-item-vertical">
+              <label for="globalUserVat">globalUserVat:</label>
+              <input
+                id="globalUserVat"
+                v-model="keaStore.keaParams.globalUserVat"
+                type="text"
+              />
+            </div>
+            <div class="setting-item-vertical">
+              <label for="e_bi_gSubExt_id">e_bi_gSubExt_id:</label>
+              <input
+                id="e_bi_gSubExt_id"
+                v-model="keaStore.keaParams.e_bi_gSubExt_id"
+                type="text"
+              />
+            </div>
+          </div>
         </div>
       </template>
     </div>
@@ -197,7 +209,8 @@ import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { useBrowserLocalStorage } from '../composables/useBrowserStorage';
 import MessagesDisplay from './MessagesDisplay.vue';
 import LastYearDataCard from './LastYearDataCard.vue';
-import { useMessageStore } from '../stores/messages.store';
+import { useTotalsStore } from '../stores/totals.store';
+import { useMessageStore } from '../stores/messages.store'; // Νέα εισαγωγή
 import { useSettingsStore } from '../stores/settings.store'; // Νέα εισαγωγή
 import { useKeaStore } from '../stores/kea.store';
 import { sendMessage, onMessage } from 'webext-bridge/content-script';
@@ -216,12 +229,14 @@ const activeTab = ref<'messages' | 'settings' | 'lastYear' | 'totals' | 'afm' | 
 // --- Pinia Stores ---
 const messageStore = useMessageStore();
 const settingsStore = useSettingsStore();
+const totalsStore = useTotalsStore();
 const keaStore = useKeaStore();
 
 // Listen for application ID changes from the background script and update the message store
-onMessage('application-id-changed', (message) => {
-  const newAppId = message.data as string | null;
-  messageStore.setApplicationId(newAppId);
+watch(activeTab, (newTab) => {
+  if (newTab === 'totals') {
+    totalsStore.fetchTotals();
+  }
 });
 
 // --- Λογική για το Banner Ενημερώσεων ---
@@ -547,6 +562,48 @@ hr {
   height: 100%;
   cursor: ew-resize;
 }
+.totals-pane {
+  padding: 15px;
+}
+
+.totals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.totals-header h4 {
+  margin: 0;
+}
+
+.totals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.total-item {
+  border: 1px solid #eee;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.total-item p {
+  margin: 0 0 5px 0;
+}
+
+.negative-diff {
+  color: red;
+  font-weight: bold;
+}
+
+.loading-state, .error-state, .no-data-state {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
 .resize-handle-b {
   bottom: 0;
   left: 0;
