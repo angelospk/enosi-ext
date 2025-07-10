@@ -59,18 +59,59 @@ async function handleShortcut(event: KeyboardEvent) {
     case '4':
       window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeeagroi';
       break;
-    case '5':
-      await navigateToTab('Ιδιοκτησία', '#/Edetedeaeeagroi');
-      break;
+    case '5':{
+      // await navigateToTab('Ιδιοκτησία', '#/Edetedeaeeagroi');
+      // Find the dropdown button.
+      const dropdownButton = document.querySelector("button.q-btn-dropdown");
+      if (dropdownButton) {
+        console.log("Extension: Clicking dropdown button to reveal submenu.", dropdownButton);
+        (dropdownButton as HTMLButtonElement).click();
+        // Wait a bit for the submenu to render
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } else {
+        console.warn("Extension: Dropdown button not found.");
+        alert("Extension: Δεν βρέθηκε το κουμπί dropdown.");
+        break;
+      }
+      //loop that tries 5 times to find the 'Γενικά Στοιχεία' button with 50ms delay between each try
+      for (let i = 0; i < 5; i++) {
+        const buttons = document.querySelectorAll("button.btn_primary");
+        let targetButton: HTMLButtonElement | null = null;
+        for (const button of Array.from(buttons)) {
+          const span = button.querySelector("span.block");
+          if (span && span.textContent?.trim() === 'Έλεγχος Λαθών Αίτησης') { 
+            targetButton = button as HTMLButtonElement;
+            break;
+          }
+        }
+        if (targetButton) {
+          console.log(`Extension: Clicking 'Έλεγχος Λαθών Αίτησης' button:`, targetButton);
+          targetButton.click();
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Now, find and click the 'Γενικά Στοιχεία' button
+      const buttons = document.querySelectorAll("button.btn_primary");
+      let targetButton: HTMLButtonElement | null = null;
+      for (const button of Array.from(buttons)) {
+        const span = button.querySelector("span.block");
+        if (span && span.textContent?.trim() === 'Έλεγχος Λαθών Αίτησης') {
+          targetButton = button as HTMLButtonElement;
+          break;
+        }
+      }
+      break
+    }
     case '6':
-      await navigateToTab('Οικολογικά Σχήματα', '#/Edetedeaeeagroi');
-      break;
-    case '7':
-      await navigateToTab('Φυτικό Κεφάλαιο', '#/Edetedeaeeagroi');
-      break;
-    case '9':
       window.location.href = 'https://eae2024.opekepe.gov.gr/eae2024/#/Edetedeaeedikaiol';
       break;
+    // case '7':
+    //   await navigateToTab('Φυτικό Κεφάλαιο', '#/Edetedeaeeagroi');
+    //   break;
+    // case '9':
+
     case '0':
       toggleUIVisibility();
       break;
