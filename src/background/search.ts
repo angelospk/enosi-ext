@@ -33,7 +33,7 @@ export function registerSearchHandlers(): void {
 
     if (match) {
       // Categorized search
-      const category = match[1].toUpperCase();
+      let category = match[1].toUpperCase();
       const operator = match[2];
       const searchTerm = match[3].trim();
       let results: SearchableItem[] = [];
@@ -41,6 +41,9 @@ export function registerSearchHandlers(): void {
       if (operator === '!') {
         // Search "recent & popular" for the given category
         const allRecent = toRaw(searchStore.recentAndPopular);
+        if (category === "P"){ category = "Π";}
+        if (category === "D"){ category = "Δ";}
+        if (category === "K"){ category = "Κ";}
         results = allRecent.filter(item =>
           item.category_code.toUpperCase() === category
           && (item.name.toLowerCase().includes(searchTerm) || item.code.toLowerCase().includes(searchTerm)),
@@ -57,7 +60,7 @@ export function registerSearchHandlers(): void {
       }
 
       console.info(`BG-Search: Sending ${results.length} results for category search '${category}${operator}'.`);
-      return results.slice(0, 50);
+      return results;
     } else {
       // Global search (no prefix)
       const allRecent = toRaw(searchStore.recentAndPopular);

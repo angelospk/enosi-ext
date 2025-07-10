@@ -266,7 +266,7 @@ const initialEdehdUpdate = [{
         if (jsonInput.hlianthos_sumbasi === true) {
             const contractChanges = [{
                 status: 0, when: Date.now(), entityName: 'Edetedeaeemetcom',
-                entity: { id: getTempId(), afm: afm, kodikos: 1, etos: EAE_YEAR, recordtype: 0, arsymbashmet: "1", dtesymbashmet: new Date("01/01/2025").toISOString(), contractektash: 1, edeId: { id: appId }, emcId: { id: CONSTANTS.HLIANTHOS_IDS.EMC_ID }, efecId: { id: CONSTANTS.HLIANTHOS_IDS.EFEC_ID } }
+                entity: { id: getTempId(), afm: afm, kodikos: 1, etos: EAE_YEAR, recordtype: 0, arsymbashmet: "1", dtesymbashmet: "2024-12-31T22:00:00.000Z", contractektash: 1, edeId: { id: appId }, emcId: { id: CONSTANTS.HLIANTHOS_IDS.EMC_ID }, efecId: { id: CONSTANTS.HLIANTHOS_IDS.EFEC_ID } }
             }];
             await executeSyncBatch(appId, contractChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeemetcom', 'Προσθήκη Σύμβασης Ηλίανθου');
         }
