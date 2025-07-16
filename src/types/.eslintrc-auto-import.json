@@ -91,6 +91,7 @@
     "getCurrentScope": true,
     "h": true,
     "handleMassUpdateFromJson": true,
+    "handleOwnershipTry": true,
     "i18n": true,
     "ignorableWatch": true,
     "inject": true,

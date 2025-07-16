@@ -6,8 +6,9 @@ import { toggleUIVisibility, toggleShortcutsModal, togglePersistentPopup } from 
 import { copyAgrotemaxioData, copyBioflagToTargets, getAfmForApplication } from './agro-actions';
 import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } from '../utils/api';
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
-import { copyPreviousYearOwnerships } from '../utils/router/ownership_try';
+import { handleOwnershipCopy } from '../utils/copy_owner';
 import { findUnusedParcels } from '../utils/ownership_agroi';
+import { handleOwnershipTry } from '../utils/copy_owner_old'
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
   const currentPath = window.location.hash;
@@ -162,7 +163,16 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
         break;
       }
-      await copyPreviousYearOwnerships(appId);
+      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ενοικιαστηρίων:');
+      if (!input) break;
+      let jsonInput;
+      try {
+        jsonInput = JSON.parse(input);
+      } catch (e) {
+        alert('Μη έγκυρο JSON.');
+        break;
+      }
+      await handleOwnershipCopy(appId, jsonInput);
       break;
     case 'o': // Greek 'ο' might map to 'o'
     case 'ο':
@@ -309,112 +319,7 @@ async function handleShortcut(event: KeyboardEvent) {
           break;
         }
     
-        // 1. Φέρε όλα τα αγροτεμάχια
-        console.log("Fetching all agrotemaxia...");
-        const allAgrotemaxiaResponse = await fetchApi('Edetedeaeeagroi/findAllByCriteriaRange_EdetedeaeeagroiGrpEda', { g_Ede_id: appId, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 1000 });
-        const agrotemaxiaMap = new Map(allAgrotemaxiaResponse.data.map((agro: any) => [String(agro.kodikos), agro]));
-        let afm="";
-        let agroOwners={};
-        // 2. Βρες τα ενοικιαστήρια με λήξη 2024 ή αρχές 2025
-        const fields = jsonInput.field_list || [];
-        const newOwnerships = [];
-        for (const field of fields) {
-          const kodikos = String(field.code);
-          const properties = field.field_property_list || [];
-          for (const prop of properties) {
-            if (!prop.rental_end_date) continue;
-            const endDate = new Date(prop.rental_end_date);
-            if (
-              (endDate.getFullYear() === 2024) 
-              // (endDate.getFullYear() === 2025 && endDate.getMonth() < 4) // Ιαν-Φεβ-Μαρτ-Απρ - ΔΕΝ ΞΕΡΩ ΑΝ ΧΡΕΙΑΖΕΤΑΙ, ΓΙΑΤΙ ΑΝ ΕΙΝΑΙ ΤΟΥ 25 το ενοικ, δε διαγραφεται στη φτεινη αιτηση
-            ) {
-              // 3. Βρες το αγροτεμάχιο στη βάση
-              const agro = agrotemaxiaMap.get(kodikos);
-              if (!agro) {
-                console.warn(`Δεν βρέθηκε αγροτεμάχιο με kodikos ${kodikos}`);
-                continue;
-              }
-              // make a dict counter of all agro ownerafm (start from number 1)
-              
-              agroOwners[agro.afm] = agroOwners[agro.afm] +1 || 1;
-              console.info(`Βρέθηκε αγροτεμάχιο ${agro}`);
-              // 4. Φέρε τις υπάρχουσες ιδιοκτησίες
-              let agroiemList = [];
-              try {
-                const resp = await fetchApi('Edetedeaeeagroiem/findAllByCriteriaRange_EdetedeaeeagroiGrpEam', {
-                  edaId_id: agro.id,
-                  gParams_yearEae: EAE_YEAR,
-                  fromRowIndex: 0,
-                  toRowIndex: 20,
-                  exc_Id: []
-                });
-                agroiemList = resp.data || [];
-              } catch (err) {
-                console.error('Σφάλμα στη λήψη ιδιοκτησιών:', err);
-                continue;
-              }
-              // get from the first item the afm
-              if (agroiemList.length>0){
-                afm=agroiemList[0].afm;
-              }
-
-              // 5. Πρόσθεσε νέα ιδιοκτησία με τα ίδια στοιχεία
-              const newOwnership = {
-                status: 0,
-                when: Date.now(),
-                entityName: "Edetedeaeeagroiem",
-                entity: {
-                  id: `TEMP_ID_${Math.random().toString(36).substr(2, 9)}`,
-                  afm: afm,
-                  recordtype: 0,
-                  usrinsert: null,
-                  dteinsert: null,
-                  usrupdate: null,
-                  dteupdate: null,
-                  kodikos: field.code,
-                  remarks: null,
-                  afmidiokthth: prop.tin,
-                  nameidiokthth: prop.full_name,
-                  sexId: null,
-                  ebbId: null,
-                  aatemparastatiko: agroOwners[agro.afm]||1,
-                  synidiopercent: prop.ownership_percent,
-                  iemtype: 1,
-                  rowVersion: null,
-                  atak: prop.atak,
-                  kaek: null,
-                  dteenoikstart: toApiDateFormat(prop.rental_start_date),
-                  dteenoikend: toApiDateFormat(prop.rental_end_date),
-                  symbarith: null,
-                  dtesymb: null,
-                  atakvalidflag: null,
-                  eEnoikArith: null,
-                  eEnoikDte: null,
-                  ektashAtak: 1,
-                  etos: EAE_YEAR,
-                  edeId: { id: appId },
-                  edaId: { id: agro?.id || null },
-                  etlId: { id: agro?.etlId?.id || null },
-                  eatexId: null,
-                  edlId: null
-                }
-              };
-              newOwnerships.push(newOwnership);
-            }
-          }
-        }
-        if (newOwnerships.length === 0) {
-          alert('Δεν βρέθηκαν ενοικιαστήρια με λήξη 2024.');
-          break;
-        }
-        // 6. Αποθήκευση στη βάση
-        try {
-          await synchronizeChanges(newOwnerships);
-          alert(`Προστέθηκαν ${newOwnerships.length} νέες ιδιοκτησίες.`);
-        } catch (err) {
-          console.error('Σφάλμα στην αποθήκευση:', err);
-          alert('Σφάλμα στην αποθήκευση. Δες το console.');
-        }
+      await handleOwnershipTry(appId, jsonInput);
       } catch (err) {
         console.error('Γενικό σφάλμα:', err);
         alert('Γενικό σφάλμα. Δες το console.');
