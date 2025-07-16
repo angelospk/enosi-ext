@@ -8,7 +8,7 @@ import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } 
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { handleOwnershipCopy } from '../utils/copy_owner';
 import { findUnusedParcels } from '../utils/ownership_agroi';
-import { handleOwnershipTry } from '../utils/copy_owner_old'
+// import { handleOwnershipCopy } from '../utils/copy_owner'
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
   const currentPath = window.location.hash;
