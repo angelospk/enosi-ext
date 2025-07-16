@@ -64,6 +64,18 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
     const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
     const applicantAfm = edehdResponse.data[0].afm;
 
+    console.log("Ανάκτηση τύπου παραστατικού για ιδιωτικό συμφωνητικό...");
+    const titleResponse = await fetchApi('Edetitle/findAllByCriteriaRange_forLov', { gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 100 });
+    const rentalTitle = titleResponse.data.find((title: any) => title.kodikos === "2020");
+
+    if (!rentalTitle) {
+        alert('Δεν βρέθηκε ο τύπος παραστατικού για ιδιωτικό συμφωνητικό (κωδικός 2020). Η διαδικασία ακυρώνεται.');
+        return;
+    }
+    const rentalTitleId = rentalTitle.id;
+    console.log(`Βρέθηκε ID για ιδιωτικό συμφωνητικό: ${rentalTitleId}`);
+
+
     for (const ownership of expiredOwnerships) {
         if (selectedOwner && ownership.full_name !== selectedOwner) continue;
 
@@ -102,7 +114,7 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
                 etos: EAE_YEAR,
                 edeId: { id: appId },
                 edaId: { id: ownership.agro.id },
-                etlId: { id: ownership.agro.etlId.id },
+                etlId: { id: rentalTitleId },
                 eatexId: null,
                 edlId: null
             }
