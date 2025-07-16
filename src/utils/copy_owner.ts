@@ -33,7 +33,8 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
         return;
     }
 
-    const owners = [...new Set(expiredOwnerships.map(o => o.full_name))];
+    const owners = [...new Set(expiredOwnerships.map(o => o.tin))];
+    let ownerCounters={};
     let ownerPrompt = "Βρέθηκαν ληγμένα ενοικιαστήρια για τους παρακάτω ιδιοκτήτες:\n";
     owners.forEach((owner, index) => {
         ownerPrompt += `${index + 1}. ${owner}\n`;
@@ -78,7 +79,7 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
 
     for (const ownership of expiredOwnerships) {
         if (selectedOwner && ownership.full_name !== selectedOwner) continue;
-
+        ownerCounters[ownership.tin]=(ownerCounters[ownership.tin]||0)+1;
         newOwnerships.push({
             status: 0,
             when: Date.now(),
@@ -97,9 +98,9 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
                 nameidiokthth: ownership.full_name,
                 sexId: null,
                 ebbId: null,
-                aatemparastatiko: 1,
+                aatemparastatiko: ownerCounters[ownership.tin]||1,
                 synidiopercent: ownership.ownership_percent,
-                iemtype: 2, // Ενοικιαζόμενο
+                iemtype: 1, // Ενοικιαζόμενο
                 rowVersion: null,
                 atak: ownership.atak,
                 kaek: null,
@@ -107,10 +108,10 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
                 dteenoikend,
                 symbarith: null,
                 dtesymb: null,
-                atakvalidflag: ownership.is_atak_valid,
+                atakvalidflag: null,
                 eEnoikArith: null,
                 eEnoikDte: null,
-                ektashAtak: ownership.ektashAtak || 1,
+                ektashAtak: ownership.area_participation_atak || 1,
                 etos: EAE_YEAR,
                 edeId: { id: appId },
                 edaId: { id: ownership.agro.id },
