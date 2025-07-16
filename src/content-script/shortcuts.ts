@@ -313,7 +313,8 @@ async function handleShortcut(event: KeyboardEvent) {
         console.log("Fetching all agrotemaxia...");
         const allAgrotemaxiaResponse = await fetchApi('Edetedeaeeagroi/findAllByCriteriaRange_EdetedeaeeagroiGrpEda', { g_Ede_id: appId, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 1000 });
         const agrotemaxiaMap = new Map(allAgrotemaxiaResponse.data.map((agro: any) => [String(agro.kodikos), agro]));
-    
+        let afm="";
+        let agroOwners={};
         // 2. Βρες τα ενοικιαστήρια με λήξη 2024 ή αρχές 2025
         const fields = jsonInput.field_list || [];
         const newOwnerships = [];
@@ -333,6 +334,10 @@ async function handleShortcut(event: KeyboardEvent) {
                 console.warn(`Δεν βρέθηκε αγροτεμάχιο με kodikos ${kodikos}`);
                 continue;
               }
+              // make a dict counter of all agro ownerafm (start from number 1)
+              
+              agroOwners[agro.afm] = agroOwners[agro.afm] +1 || 1;
+              console.info(`Βρέθηκε αγροτεμάχιο ${agro}`);
               // 4. Φέρε τις υπάρχουσες ιδιοκτησίες
               let agroiemList = [];
               try {
@@ -348,6 +353,11 @@ async function handleShortcut(event: KeyboardEvent) {
                 console.error('Σφάλμα στη λήψη ιδιοκτησιών:', err);
                 continue;
               }
+              // get from the first item the afm
+              if (agroiemList.length>0){
+                afm=agroiemList[0].afm;
+              }
+
               // 5. Πρόσθεσε νέα ιδιοκτησία με τα ίδια στοιχεία
               const newOwnership = {
                 status: 0,
@@ -355,7 +365,7 @@ async function handleShortcut(event: KeyboardEvent) {
                 entityName: "Edetedeaeeagroiem",
                 entity: {
                   id: `TEMP_ID_${Math.random().toString(36).substr(2, 9)}`,
-                  afm: prop.tin,
+                  afm: afm,
                   recordtype: 0,
                   usrinsert: null,
                   dteinsert: null,
@@ -367,9 +377,9 @@ async function handleShortcut(event: KeyboardEvent) {
                   nameidiokthth: prop.full_name,
                   sexId: null,
                   ebbId: null,
-                  aatemparastatiko: null,
+                  aatemparastatiko: agroOwners[agro.afm]||1,
                   synidiopercent: prop.ownership_percent,
-                  iemtype: 2,
+                  iemtype: 1,
                   rowVersion: null,
                   atak: prop.atak,
                   kaek: null,
@@ -377,7 +387,7 @@ async function handleShortcut(event: KeyboardEvent) {
                   dteenoikend: toApiDateFormat(prop.rental_end_date),
                   symbarith: null,
                   dtesymb: null,
-                  atakvalidflag: prop.is_atak_valid,
+                  atakvalidflag: null,
                   eEnoikArith: null,
                   eEnoikDte: null,
                   ektashAtak: 1,
