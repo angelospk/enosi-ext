@@ -83,7 +83,7 @@ const CONSTANTS = {
 async function executeSyncBatch(appId: string, changes: any[], endpoint: string, logMessage: string): Promise<boolean> {
     if (changes.length === 0) {
         console.log(`  -> Παράλειψη: ${logMessage} (δεν υπάρχουν αλλαγές).`);
-        return true; // Θεωρείται επιτυχία αφού δεν υπήρχε κάτι να γίνει.
+        return true;
     }
 
     try {
@@ -91,11 +91,16 @@ async function executeSyncBatch(appId: string, changes: any[], endpoint: string,
         const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
         const cleanedEdehd = prepareEntityForRequest(edehdResponse.data[0]);
 
-        changes.push({
+        const finalChanges = changes.map(change => ({
+            ...change,
+            entity: prepareEntityForRequest(change.entity)
+        }));
+
+        finalChanges.push({
             status: 1, when: 0, entityName: "Edetedeaeehd", entity: cleanedEdehd
         });
         
-        const response = await fetchApi(endpoint, { params: { data: changes } });
+        const response = await fetchApi(endpoint, { params: { data: finalChanges } });
         
         console.log(`     ...Ολοκληρώθηκε. Απάντηση:`, response);
         if (response && (response.warningMessages || response.errorMessages)) {
@@ -105,7 +110,7 @@ async function executeSyncBatch(appId: string, changes: any[], endpoint: string,
 
     } catch (error) {
         console.error(`--- ΣΦΑΛΜΑ στο βήμα: "${logMessage}" ---`, error);
-        return false; // Επιστρέφουμε false αντί να πετάξουμε το σφάλμα.
+        return false;
     }
 }
 
