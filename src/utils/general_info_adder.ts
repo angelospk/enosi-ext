@@ -186,7 +186,12 @@ const initialEdehdUpdate = [{
                     entity: {
                         id: getTempId(), afm: afm, kodikos: metraKodikosCounter, etos: EAE_YEAR, eaaLt2: 2,
                         recordtype: 0,
-                        edeId: { id: appId }, eaaId: { id: eaaId }, sexId: sexIdObject
+                        edeId: { id: appId }, eaaId: { id: eaaId }, sexId: sexIdObject,
+                        usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
+                        arapof: null, dteapof: null, mmz: null, mmzaiges: null,
+                        mmzbookre: null, mmzboogal: null, afmspouse: null,
+                        lastnamespouse: null, firstnamespouse: null, fathernamespouse: null,
+                        remarks: null, rowVersion: null, eomId: null
                     }
                 });
             });

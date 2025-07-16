@@ -84,8 +84,8 @@ export const prepareEntityForRequest = (entity: any): any => {
                 } else if (value && typeof value === 'object' && Array.isArray(value)) {
                     value = traverseAndPrepare(value);
                 }
-                if (value !== null && value !== undefined) {
-                    if (typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 0) {
+                if (value !== undefined) {
+                    if (value === null || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 0) {
                         newObj[key] = value;
                     }
                 }

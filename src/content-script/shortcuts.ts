@@ -319,7 +319,7 @@ async function handleShortcut(event: KeyboardEvent) {
           break;
         }
     
-      await handleOwnershipTry(appId, jsonInput);
+      await handleOwnershipCopy(appId, jsonInput);
       } catch (err) {
         console.error('Γενικό σφάλμα:', err);
         alert('Γενικό σφάλμα. Δες το console.');
