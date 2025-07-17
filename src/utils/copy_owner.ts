@@ -1,17 +1,14 @@
-import { fetchApi, EAE_YEAR } from './api';
-// Assuming executeSync is also exported from api or another utility file
-// If not, you'll need to define it. For this example, let's assume it's in './api'.
-import { executeSync } from './api'; 
-
 export async function handleOwnershipCopy(appId: string, jsonInput: any) {
     console.log(`--- Έναρξη Διαχείρισης Ιδιοκτησίας ---`);
 
     const allAgrotemaxiaResponse = await fetchApi('Edetedeaeeagroi/findAllByCriteriaRange_EdetedeaeeagroiGrpEda', { g_Ede_id: appId, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 1000 });
     const agrotemaxiaMap = new Map(allAgrotemaxiaResponse.data.map((agro: any) => [String(agro.kodikos), agro]));
+    console.log(`Βρέθηκαν ${agrotemaxiaMap.size} αγροτεμάχια στην αίτηση.`);
 
     const fields = jsonInput.field_list || [];
     const expiredOwnerships = [];
 
+    console.log("Αναζήτηση για ενοικιαστήρια που λήγουν τον Ιούνιο του 2025...");
     for (const field of fields) {
         const kodikos = String(field.code);
         const properties = field.field_property_list || [];
@@ -19,7 +16,8 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
             if (!prop.rental_end_date) continue;
 
             const endDate = new Date(prop.rental_end_date);
-            if (endDate.getFullYear() === 2024) {
+            // Αλλαγή συνθήκης για λήξη τον Ιούνιο του 2025
+            if (endDate.getFullYear() < 2025 || (endDate.getFullYear() === 2025 && endDate.getMonth() < 5)) { // getMonth() είναι 0-indexed, άρα 5 = Ιούνιος
                 const agro = agrotemaxiaMap.get(kodikos);
                 if (agro) {
                     expiredOwnerships.push({ ...prop, agro });
@@ -28,8 +26,9 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
         }
     }
 
+    console.log(`Βρέθηκαν ${expiredOwnerships.length} ληγμένα ενοικιαστήρια που ταιριάζουν στα κριτήρια.`);
     if (expiredOwnerships.length === 0) {
-        alert('Δεν βρέθηκαν ενοικιαστήρια με λήξη το 2024.');
+        alert('Δεν βρέθηκαν ενοικιαστήρια με λήξη τον Ιούνιο του 2025.');
         return;
     }
 
@@ -39,22 +38,33 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
     owners.forEach((owner, index) => {
         ownerPrompt += `${index + 1}. ${owner}\n`;
     });
-    ownerPrompt += "\nΕπιλέξτε τον αριθμό του ιδιοκτήτη για τον οποίο θέλετε να ανανεώσετε τα ενοικιαστήρια (ή 0 για όλους):";
+    ownerPrompt += "\nΕπιλέξτε τον αριθμό του ιδιοκτήτη για τον οποίο θέλετε να ανανεώσετε τα ενοικιαστήρια :";
 
     const ownerIndexStr = prompt(ownerPrompt);
-    if (ownerIndexStr === null) return;
+    if (ownerIndexStr === null) {
+        console.log("Η διαδικασία ακυρώθηκε από τον χρήστη στο prompt επιλογής ιδιοκτήτη.");
+        return;
+    }
 
     const ownerIndex = parseInt(ownerIndexStr, 10);
     let selectedOwner: string | null = null;
     if (ownerIndex > 0 && ownerIndex <= owners.length) {
         selectedOwner = owners[ownerIndex - 1];
     }
+    console.log(`Επιλεγμένος ιδιοκτήτης: ${selectedOwner || 'Όλοι'}`);
 
     const startDateStr = prompt("Εισάγετε την ημερομηνία έναρξης (DD/MM/YYYY):", "01/01/2025");
-    if (!startDateStr) return;
+    if (!startDateStr) {
+        console.log("Η διαδικασία ακυρώθηκε από τον χρήστη στο prompt ημερομηνίας έναρξης.");
+        return;
+    }
 
     const endDateStr = prompt("Εισάγετε την ημερομηνία λήξης (DD/MM/YYYY):", "31/12/2030");
-    if (!endDateStr) return;
+    if (!endDateStr) {
+        console.log("Η διαδικασία ακυρώθηκε από τον χρήστη στο prompt ημερομηνίας λήξης.");
+        return;
+    }
+    console.log(`Επιλεγμένες ημερομηνίες: Έναρξη=${startDateStr}, Λήξη=${endDateStr}`);
 
     const [startDay, startMonth, startYear] = startDateStr.split('/').map(Number);
     const [endDay, endMonth, endYear] = endDateStr.split('/').map(Number);
@@ -76,11 +86,13 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
     const rentalTitleId = rentalTitle.id;
     console.log(`Βρέθηκε ID για ιδιωτικό συμφωνητικό: ${rentalTitleId}`);
 
-
+    console.log("Προετοιμασία νέων εγγραφών ιδιοκτησίας...");
     for (const ownership of expiredOwnerships) {
-        if (selectedOwner && ownership.full_name !== selectedOwner) continue;
+        if (selectedOwner && ownership.tin !== selectedOwner) continue;
+        
         ownerCounters[ownership.tin]=(ownerCounters[ownership.tin]||0)+1;
-        newOwnerships.push({
+        
+        const newOwnershipEntry = {
             status: 0,
             when: Date.now(),
             entityName: "Edetedeaeeagroiem",
@@ -92,7 +104,7 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
                 dteinsert: null,
                 usrupdate: null,
                 dteupdate: null,
-                kodikos: ownership.agro.kodikos,
+                kodikos: ownership.code,
                 remarks: null,
                 afmidiokthth: ownership.tin,
                 nameidiokthth: ownership.full_name,
@@ -119,22 +131,25 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
                 eatexId: null,
                 edlId: null
             }
-        });
+        };
+
+        console.log('Logging new ownership object before push:', JSON.stringify(newOwnershipEntry, null, 2));
+        newOwnerships.push(newOwnershipEntry);
     }
 
+    console.log(`Δημιουργήθηκαν ${newOwnerships.length} νέες εγγραφές ιδιοκτησίας για αποθήκευση.`);
     if (newOwnerships.length === 0) {
-        alert('Δεν δημιουργήθηκαν νέα ενοικιαστήρια.');
+        alert('Δεν δημιουργήθηκαν νέα ενοικιαστήρια για αποθήκευση. Ελέγξτε το console για πιθανά σφάλματα στη λογική φιλτραρίσματος.');
         return;
     }
     
-    // The try/catch block now correctly resides inside the async function
     try {
-        // Note: The original code used 'executeSync' but the import was for 'synchronizeChanges'
-        // I am assuming 'executeSync' is the correct function name.
+        console.log("Κλήση executeSync για αποθήκευση των αλλαγών...");
         await executeSync(newOwnerships, appId);
         alert(`Προστέθηκαν ${newOwnerships.length} νέες ιδιοκτησίες.`);
+        console.log("Η αποθήκευση ολοκληρώθηκε με επιτυχία.");
     } catch (err) {
         console.error('Σφάλμα στην αποθήκευση:', err);
-        alert('Σφάλμα στην αποθήκευση. Δες το console.');
+        alert('Σφάλμα στην αποθήκευση. Δες το console για λεπτομέρειες.');
     }
 } // <-- This is the correct final closing brace for the function.
