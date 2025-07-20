@@ -63,6 +63,7 @@ declare global {
   const h: typeof import('vue')['h']
   const handleMassUpdateFromJson: typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']
   const handleOwnershipCopy: typeof import('../utils/copy_owner')['handleOwnershipCopy']
+  const handleOwnershipRefresh: typeof import('../utils/mass_update_ownerships')['handleOwnershipRefresh']
   const handleOwnershipTry: typeof import('../utils/copy_owner_old')['handleOwnershipTry']
   const handleShortcut: typeof import('../utils/shortcut-manager')['handleShortcut']
   const i18n: typeof import('../utils/i18n')['i18n']
@@ -467,6 +468,7 @@ declare module 'vue' {
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly handleMassUpdateFromJson: UnwrapRef<typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']>
     readonly handleOwnershipCopy: UnwrapRef<typeof import('../utils/copy_owner')['handleOwnershipCopy']>
+    readonly handleOwnershipRefresh: UnwrapRef<typeof import('../utils/mass_update_ownerships')['handleOwnershipRefresh']>
     readonly i18n: UnwrapRef<typeof import('../utils/i18n')['i18n']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>

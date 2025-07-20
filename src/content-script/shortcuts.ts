@@ -8,6 +8,7 @@ import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } 
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { handleOwnershipCopy } from '../utils/copy_owner';
 import { findUnusedParcels } from '../utils/ownership_agroi';
+import { handleOwnershipRefresh } from '../utils/mass_update_ownerships';
 // import { handleOwnershipCopy } from '../utils/copy_owner'
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
@@ -163,7 +164,7 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
         break;
       }
-      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ενοικιαστηρίων:');
+      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική ανανέωση ιδιοκτησιών:');
       if (!input) break;
       let jsonInput;
       try {
@@ -172,7 +173,8 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('Μη έγκυρο JSON.');
         break;
       }
-      await handleOwnershipCopy(appId, jsonInput);
+      // await handleOwnershipCopy(appId, jsonInput);
+      await handleOwnershipRefresh(appId, jsonInput);
       break;
     case 'o': // Greek 'ο' might map to 'o'
     case 'ο':
@@ -304,7 +306,7 @@ async function handleShortcut(event: KeyboardEvent) {
     case '`': {
       // Ctrl + `
       try {
-        const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ενοικιαστηρίων:');
+        const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ληγμένων ενοικιαστηρίων:');
         if (!input) break;
         let jsonInput;
         try {

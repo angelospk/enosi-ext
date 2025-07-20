@@ -92,6 +92,7 @@
     "h": true,
     "handleMassUpdateFromJson": true,
     "handleOwnershipCopy": true,
+    "handleOwnershipRefresh": true,
     "i18n": true,
     "ignorableWatch": true,
     "inject": true,
