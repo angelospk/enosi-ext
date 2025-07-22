@@ -52,3 +52,4 @@ The JSON file for the mass ownership update should be an array of objects, where
 - **`aatemparastatiko`**: The document number. If set to `0`, the next available number will be used.
 - **`dteenoikstart`**: The start date of the rental agreement.
 - **`dteenoikend`**: The end date of the rental agreement.
+- **`same`**: The field that stays the same if the ownership is updated, otherwise it can be null.

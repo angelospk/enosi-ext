@@ -9,6 +9,7 @@ import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { handleOwnershipCopy } from '../utils/copy_owner';
 import { findUnusedParcels } from '../utils/ownership_agroi';
 import { handleOwnershipRefresh } from '../utils/mass_update_ownerships';
+import { info } from 'console';
 // import { handleOwnershipCopy } from '../utils/copy_owner'
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
@@ -189,6 +190,25 @@ async function handleShortcut(event: KeyboardEvent) {
         console.log('unusedParcels', unusedParcels);
       }
       break;
+    }
+    case '[':
+    {
+      const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
+        const afm = edehdResponse.data[0].afm;
+        const keaStore = useKeaStore();
+        const reportResponse = await fetchApi('Reports/ReportsBtnFrm_RepEdeCsBtn_action', { reportFormat: 1, BD_EDE_ID: appId, I_ETOS: EAE_YEAR });
+        const base64String = reportResponse.data;
+        const rawBinaryString = atob(base64String);
+        const len = rawBinaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = rawBinaryString.charCodeAt(i);
+        }
+        const fileBlob = new Blob([bytes], { type: 'application/json' });
+        const jsonData = JSON.parse(await fileBlob.text());
+        const cleanedData = cleanGeospatialData(jsonData);
+        console.info(cleanedData);
+        break;
     }
     case 'μ':
     case 'm': {

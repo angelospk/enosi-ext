@@ -1,3 +1,16 @@
+function copyAttributes(item, target) {
+    item.id = target.id;
+    item.recordtype=target.recordtype;
+    item.aatemparastatiko=target.aatemparastatiko;
+    item.sexId=target.sexId;
+    item.usrinsert=target.usrinsert;
+    item.usrupdate=target.usrupdate;
+    item.dteinsert=target.dteinsert;
+    item.dteupdate=target.dteupdate;
+    item.rowVersion = target.rowVersion;
+    return item;
+}
+import { writeHeapSnapshot } from 'v8';
 import { fetchApi, executeSync, EAE_YEAR } from './api';
 
 /**
@@ -8,6 +21,7 @@ import { fetchApi, executeSync, EAE_YEAR } from './api';
 export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
     console.log(`--- Έναρξη Μαζικής Ανανέωσης Ιδιοκτησιών για την αίτηση ${appId} ---`);
     document.body.style.cursor = 'wait';
+    let warns=[];
 
     try {
         // --- ΒΗΜΑ 1: Ανάκτηση Βοηθητικών Δεδομένων --- 
@@ -27,7 +41,7 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
         console.log("Βήμα 2: Επεξεργασία JSON εισόδου...");
         const changes = [];
 
-        for (const item of jsonInput) {
+        for (let item of jsonInput) {
             const agro = agrotemaxiaMap.get(String(item.kodikos_agrotemaxiou));
             if (!agro) {
                 console.warn(`! Παράλειψη: Δεν βρέθηκε αγροτεμάχιο με κωδικό ${item.kodikos_agrotemaxiou}`);
@@ -54,17 +68,56 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
                 kodikos = maxKodikos + 1;
             }
 
-            let aatemparastatiko = item.aatemparastatiko;
+            const aatemparastatiko = item.aatemparastatiko;
+            // let rowVersion=0;
             if (aatemparastatiko === 0) {
                 const ownerOwnerships = existingOwnerships.filter(o => o.afmidiokthth === item.afmidiokthth);
-                aatemparastatiko = ownerOwnerships.length + 1;
+                item.aatemparastatiko = ownerOwnerships.length + 1;
+
             }
+            if (item.status === 2  ) {
+                const ownerOwnerships = existingOwnerships.filter(o => o.afmidiokthth === item.afmidiokthth);
+                //try to find the specific ownership to update
+                if (ownerOwnerships.length > 0) {
+                    //check if item.atak is in  any of the existingOwnerships
+                    const existingOwnership = ownerOwnerships.find(o => o.atak === item.atak);
+                    if (existingOwnership) {
+                        item=copyAttributes(item, existingOwnership);
+                    }
+                    else{
+                        //check if item.ektashAtak is in  any of the existingOwnerships
+                        const existingOwnership = ownerOwnerships.find(o => o.ektashAtak === item.ektashAtak);
+                        if (existingOwnership) {
+                            item=copyAttributes(item, existingOwnership);
+                        }
+                        else{
+                            //report that no match is found
+                            console.warn(`No match found for item: ${JSON.stringify(item)}`);
+                            warns.push(item);
+                        }
+                    }
+                        
+                    
+                // rowVersion = ownerOwnerships.length + 2;
+            }}
+
+            if (item.status === 1) {
+            const existingOwnership = existingOwnerships.find(o => o[item.same] === item[item.same]);
+            if (existingOwnership) {
+                item=copyAttributes(item, existingOwnership);
+
+            }
+            else{
+                console.warn(`No match found for item: ${JSON.stringify(item)}`);
+                warns.push(item);
+            }
+        }
 
             const entity: any = {
                 id: item.id || `TEMP_ID_${Math.random().toString(36).substr(2, 9)}`,
                 afm: applicantAfm,
-                recordtype: item.status === 1 ? (item.rowVersion || 0) + 2 : 0,
-                rowVersion: item.status === 1 ? item.rowVersion : null,
+                recordtype: item.status === 0 ? 0 :item.recordtype || 0,
+                rowVersion: item.status === 0 ? null : item.rowVersion + 2 ,
                 kodikos: item.kodikos || kodikos,
                 afmidiokthth: item.afmidiokthth,
                 nameidiokthth: item.nameidiokthth,
@@ -74,13 +127,16 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
                 ektashAtak: item.ektashAtak,
                 dteenoikstart: item.dteenoikstart || null,
                 dteenoikend: item.dteenoikend || null,
-                aatemparastatiko: aatemparastatiko,
+                aatemparastatiko: item.aatemparastatiko,
                 etos: EAE_YEAR,
                 edeId: { id: appId },
                 edaId: { id: agro.id },
                 etlId: { id: ownershipTitle.id },
             };
+            if (item.status !== 0) {
+                entity.sexId = item.sexId;
 
+            }
             changes.push({
                 status: item.status,
                 when: Date.now(),
@@ -106,5 +162,8 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
     } finally {
         document.body.style.cursor = 'default';
         console.log("--- Τέλος Μαζικής Ανανέωσης Ιδιοκτησιών ---");
+        if (warns.length > 0) {
+            alert(`Προσοχή! Δεν βρέθηκαν αντιστοιχίσεις για τα ακόλουθα αγροτεμαχία:\n${JSON.stringify(warns)}`);
+        }
     }
 }
