@@ -58,6 +58,7 @@ declare global {
   const formLoadingInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formLoadingInjectionKey']
   const formOptionsInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formOptionsInjectionKey']
   const getActivePinia: typeof import('pinia')['getActivePinia']
+  const getCleanedGeospatialData: typeof import('../utils/json_cleaner')['getCleanedGeospatialData']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const h: typeof import('vue')['h']
@@ -463,6 +464,7 @@ declare module 'vue' {
     readonly formLoadingInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formLoadingInjectionKey']>
     readonly formOptionsInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formOptionsInjectionKey']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
+    readonly getCleanedGeospatialData: UnwrapRef<typeof import('../utils/json_cleaner')['getCleanedGeospatialData']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>

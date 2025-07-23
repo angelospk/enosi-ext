@@ -87,6 +87,7 @@
     "formLoadingInjectionKey": true,
     "formOptionsInjectionKey": true,
     "getActivePinia": true,
+    "getCleanedGeospatialData": true,
     "getCurrentInstance": true,
     "getCurrentScope": true,
     "h": true,

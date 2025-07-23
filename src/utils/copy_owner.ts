@@ -31,7 +31,6 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
         alert('Δεν βρέθηκαν ενοικιαστήρια με λήξη τον Ιούνιο του 2025.');
         return;
     }
-
     const owners = [...new Set(expiredOwnerships.map(o => o.tin))];
     let ownerCounters={};
     let ownerPrompt = "Βρέθηκαν ληγμένα ενοικιαστήρια για τους παρακάτω ιδιοκτήτες:\n";
@@ -47,10 +46,20 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
     }
 
     const ownerIndex = parseInt(ownerIndexStr, 10);
+    let selectedOwners: string[] = [];
+    if (ownerIndex==0) {
+        selectedOwners=Array.from(owners);
+    }
+    else{
     let selectedOwner: string | null = null;
     if (ownerIndex > 0 && ownerIndex <= owners.length) {
         selectedOwner = owners[ownerIndex - 1];
     }
+    if (selectedOwner) {
+    selectedOwners.push(selectedOwner);
+    }
+    }
+    for (const selectedOwner of selectedOwners) {
     console.log(`Επιλεγμένος ιδιοκτήτης: ${selectedOwner || 'Όλοι'}`);
 
     const startDateStr = prompt("Εισάγετε την ημερομηνία έναρξης (DD/MM/YYYY):", "01/01/2025");
@@ -133,7 +142,7 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
             }
         };
 
-        console.log('Logging new ownership object before push:', JSON.stringify(newOwnershipEntry, null, 2));
+        // console.log('Logging new ownership object before push:', JSON.stringify(newOwnershipEntry, null, 2));
         newOwnerships.push(newOwnershipEntry);
     }
 
@@ -142,6 +151,7 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
         alert('Δεν δημιουργήθηκαν νέα ενοικιαστήρια για αποθήκευση. Ελέγξτε το console για πιθανά σφάλματα στη λογική φιλτραρίσματος.');
         return;
     }
+
     
     try {
         console.log("Κλήση executeSync για αποθήκευση των αλλαγών...");
@@ -151,5 +161,6 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
     } catch (err) {
         console.error('Σφάλμα στην αποθήκευση:', err);
         alert('Σφάλμα στην αποθήκευση. Δες το console για λεπτομέρειες.');
+    }
     }
 } // <-- This is the correct final closing brace for the function.

@@ -193,20 +193,7 @@ async function handleShortcut(event: KeyboardEvent) {
     }
     case '[':
     {
-      const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
-        const afm = edehdResponse.data[0].afm;
-        const keaStore = useKeaStore();
-        const reportResponse = await fetchApi('Reports/ReportsBtnFrm_RepEdeCsBtn_action', { reportFormat: 1, BD_EDE_ID: appId, I_ETOS: EAE_YEAR });
-        const base64String = reportResponse.data;
-        const rawBinaryString = atob(base64String);
-        const len = rawBinaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = rawBinaryString.charCodeAt(i);
-        }
-        const fileBlob = new Blob([bytes], { type: 'application/json' });
-        const jsonData = JSON.parse(await fileBlob.text());
-        const cleanedData = cleanGeospatialData(jsonData);
+        const cleanedData = await getCleanedGeospatialData(appId, EAE_YEAR);
         console.info(cleanedData);
         break;
     }
@@ -240,27 +227,13 @@ async function handleShortcut(event: KeyboardEvent) {
       console.log('jsonInput', jsonInput);
       await handleMassUpdateFromJson(jsonInput, appId);
         await fetchApi('MainService/fetchOwnerAtakInfoFromAade?', { edeId: appId, forceUpdate: true, etos: EAE_YEAR });
-        const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
-        const afm = edehdResponse.data[0].afm;
-        const keaStore = useKeaStore();
-        const prevYearEdeResponse = await fetchApi('MainService/getEdesByAfm?', { str_afm: afm, str_UserType: keaStore.keaParams.gUserType, globalUserVat: keaStore.keaParams.globalUserVat, e_bi_gSubExt_id: keaStore.keaParams.e_bi_gSubExt_id, i_etos: EAE_YEAR - 1 });
-        const prevYearEdeId = prevYearEdeResponse.data[0].id;
-        const reportResponse = await fetchApi('Reports/ReportsBtnFrm_RepEdeCsBtn_action', { reportFormat: 1, BD_EDE_ID: prevYearEdeId, I_ETOS: EAE_YEAR - 1 });
-        const base64String = reportResponse.data;
-        const rawBinaryString = atob(base64String);
-        const len = rawBinaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = rawBinaryString.charCodeAt(i);
-        }
-        const fileBlob = new Blob([bytes], { type: 'application/json' });
-        const jsonData = JSON.parse(await fileBlob.text());
-        const cleanedData = cleanGeospatialData(jsonData);
+        const cleanedData = await getCleanedGeospatialData(appId, EAE_YEAR - 1);
         
         const cleanedFileBlob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
         const downloadUrl = window.URL.createObjectURL(cleanedFileBlob);
         const link = document.createElement('a');
         link.href = downloadUrl;
+        const afm= cleanedData.tin||appId;
         link.download = `${afm}.json`;
         document.body.appendChild(link);
         link.click();
@@ -326,20 +299,9 @@ async function handleShortcut(event: KeyboardEvent) {
     case '`': {
       // Ctrl + `
       try {
-        const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ληγμένων ενοικιαστηρίων:');
-        if (!input) break;
-        let jsonInput;
-        try {
-          jsonInput = JSON.parse(input);
-        } catch (e) {
-          alert('Μη έγκυρο JSON.');
-          break;
-        }
-        const appId = messageStore.currentApplicationId;
-        if (!appId) {
-          alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
-          break;
-        }
+
+      
+      const jsonInput = await getCleanedGeospatialData(appId, EAE_YEAR-1);
     
       await handleOwnershipCopy(appId, jsonInput);
       } catch (err) {
