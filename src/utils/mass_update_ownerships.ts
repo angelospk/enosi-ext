@@ -45,12 +45,14 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
             const agro = agrotemaxiaMap.get(String(item.kodikos_agrotemaxiou));
             if (!agro) {
                 console.warn(`! Παράλειψη: Δεν βρέθηκε αγροτεμάχιο με κωδικό ${item.kodikos_agrotemaxiou}`);
+                warns.push(item);
                 continue;
             }
 
             const ownershipTitle = titleMap.get(String(item.iemtype_kodikos));
             if (!ownershipTitle) {
                 console.warn(`! Παράλειψη: Δεν βρέθηκε τύπος ιδιοκτησίας με κωδικό ${item.iemtype_kodikos}`);
+                warns.push(item);
                 continue;
             }
 
@@ -94,6 +96,7 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
                             //report that no match is found
                             console.warn(`No match found for item: ${JSON.stringify(item)}`);
                             warns.push(item);
+                            continue;
                         }
                     }
                         
@@ -110,6 +113,7 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
             else{
                 console.warn(`No match found for item: ${JSON.stringify(item)}`);
                 warns.push(item);
+                continue;
             }
         }
 
