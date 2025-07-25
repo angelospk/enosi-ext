@@ -11,6 +11,7 @@ declare global {
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
   const appRouter: typeof import('../utils/router/index')['appRouter']
   const applyTheme: typeof import('../composables/useTheme')['applyTheme']
+  const askGeminiAi: typeof import('../utils/geminiai')['askGeminiAi']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarGroupInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['avatarGroupInjectionKey']
@@ -417,6 +418,7 @@ declare module 'vue' {
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly appRouter: UnwrapRef<typeof import('../utils/router/index')['appRouter']>
     readonly applyTheme: UnwrapRef<typeof import('../composables/useTheme')['applyTheme']>
+    readonly askGeminiAi: UnwrapRef<typeof import('../utils/geminiai')['askGeminiAi']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarGroupInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['avatarGroupInjectionKey']>

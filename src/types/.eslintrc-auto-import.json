@@ -40,6 +40,7 @@
     "acceptHMRUpdate": true,
     "appRouter": true,
     "applyTheme": true,
+    "askGeminiAi": true,
     "asyncComputed": true,
     "autoResetRef": true,
     "avatarGroupInjectionKey": true,

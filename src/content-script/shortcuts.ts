@@ -9,6 +9,7 @@ import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { handleOwnershipCopy } from '../utils/copy_owner';
 import { findUnusedParcels } from '../utils/ownership_agroi';
 import { handleOwnershipRefresh } from '../utils/mass_update_ownerships';
+import { askGeminiAi } from '../utils/geminiai';
 import { info } from 'console';
 // import { handleOwnershipCopy } from '../utils/copy_owner'
 
@@ -227,18 +228,40 @@ async function handleShortcut(event: KeyboardEvent) {
       console.log('jsonInput', jsonInput);
       await handleMassUpdateFromJson(jsonInput, appId);
         await fetchApi('MainService/fetchOwnerAtakInfoFromAade?', { edeId: appId, forceUpdate: true, etos: EAE_YEAR });
+        // get cleaned data for previous year
         const cleanedData = await getCleanedGeospatialData(appId, EAE_YEAR - 1);
         
-        const cleanedFileBlob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
-        const downloadUrl = window.URL.createObjectURL(cleanedFileBlob);
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        const afm= cleanedData.tin||appId;
-        link.download = `${afm}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
+      
+      console.info("Last year data", cleanedData);
+
+      // get error messages
+      let messages;
+      try {
+          const response = await fetch("https://eae2024.opekepe.gov.gr/eae2024/rest/MainService/checkAee?", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+            body: JSON.stringify({ etos: new Date().getFullYear(), edeId: appId }),
+            credentials: "include",
+          });
+
+      
+          messages = await response.json();
+        } catch (error: any) {
+          console.error("Error during message polling:", error);
+        } 
+        console.info("Messages", messages);
+       await askGeminiAi(cleanedData, messages);
+
+        // const cleanedFileBlob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
+        // const downloadUrl = window.URL.createObjectURL(cleanedFileBlob);
+        // const link = document.createElement('a');
+        // link.href = downloadUrl;
+        // const afm= cleanedData.tin||appId;
+        // link.download = `${afm}.json`;
+        // document.body.appendChild(link);
+        // link.click();
+        // document.body.removeChild(link);
+        // window.URL.revokeObjectURL(downloadUrl);
       } catch (error) {
         alert(`Προέκυψε σφάλμα: ${(error as Error).message}`);
       }

@@ -16,11 +16,15 @@ export const useSettingsStore = defineStore('settings', () => {
   const { data: restoreDismissedOnNewApp, promise: restoreDismissedPromise } =
     useBrowserLocalStorage<boolean>('settings_restoreDismissedOnNewApp', false);
 
+  // --- Gemini AI Settings ---
+  const { data: geminiApiKey, promise: geminiApiKeyPromise } =
+    useBrowserLocalStorage<string | null>('settings_geminiApiKey', null);
+
   // Settings are now managed directly by the background script by listening to browser.storage.onChanged.
   // This avoids runtime errors when other contexts (like popups) are closed.
 
   // Ensure all settings are loaded before use if needed, though useBrowserLocalStorage handles this well.
-  const promises = [pollingEnabledPromise, pollingIntervalPromise, restoreDismissedPromise];
+  const promises = [pollingEnabledPromise, pollingIntervalPromise, restoreDismissedPromise, geminiApiKeyPromise];
   const allSettingsLoaded = Promise.all(promises);
 
   return {
@@ -28,6 +32,7 @@ export const useSettingsStore = defineStore('settings', () => {
     pollingEnabled,
     pollingInterval,
     restoreDismissedOnNewApp,
+    geminiApiKey,
 
     // Status
     allSettingsLoaded,
