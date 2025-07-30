@@ -154,13 +154,32 @@ export async function handleOwnershipCopy(appId: string, jsonInput: any) {
 
     
     try {
-        console.log("Κλήση executeSync για αποθήκευση των αλλαγών...");
-        await executeSync(newOwnerships, appId);
-        alert(`Προστέθηκαν ${newOwnerships.length} νέες ιδιοκτησίες.`);
-        console.log("Η αποθήκευση ολοκληρώθηκε με επιτυχία.");
+        console.log("Κλήση executeSync για αποθήκευση των αλλαγών μία προς μία...");
+        let successCount = 0;
+        let errorCount = 0;
+        for (const ownership of newOwnerships) {
+            try {
+                await executeSync([ownership], appId);
+                successCount++;
+            } catch (err) {
+                errorCount++;
+                console.error('Σφάλμα στην αποθήκευση της ιδιοκτησίας:', ownership, err);
+            }
+        }
+
+        if (errorCount > 0) {
+            alert(`Ολοκληρώθηκε με σφάλματα.
+Επιτυχής προσθήκη: ${successCount}
+Αποτυχίες: ${errorCount}
+Δείτε το console για λεπτομέρειες.`);
+        } else {
+            alert(`Προστέθηκαν επιτυχώς ${successCount} νέες ιδιοκτησίες.`);
+        }
+        console.log("Η διαδικασία αποθήκευσης ολοκληρώθηκε.");
+
     } catch (err) {
-        console.error('Σφάλμα στην αποθήκευση:', err);
-        alert('Σφάλμα στην αποθήκευση. Δες το console για λεπτομέρειες.');
+        console.error('Γενικό σφάλμα κατά τη διαδικασία αποθήκευσης:', err);
+        alert('Προέκυψε ένα μη αναμενόμενο σφάλμα. Δείτε το console για λεπτομέρειες.');
     }
     }
 } // <-- This is the correct final closing brace for the function.

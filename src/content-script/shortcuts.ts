@@ -196,6 +196,7 @@ async function handleShortcut(event: KeyboardEvent) {
     {
         const cleanedData = await getCleanedGeospatialData(appId, EAE_YEAR);
         console.info(cleanedData);
+        console.info("Fields:", cleanedData.field_list);
         break;
     }
     case 'μ':
@@ -233,6 +234,7 @@ async function handleShortcut(event: KeyboardEvent) {
         
       
       console.info("Last year data", cleanedData);
+      console.info("Fields:", cleanedData.field_list);
 
       // get error messages
       let messages;

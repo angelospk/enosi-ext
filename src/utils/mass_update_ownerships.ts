@@ -156,9 +156,21 @@ export async function handleOwnershipRefresh(appId: string, jsonInput: any[]) {
             return;
         }
 
-        console.log("Βήμα 3: Αποστολή αλλαγών στον server...");
-        await executeSync(changes, appId);
-        alert(`Η μαζική ανανέωση ιδιοκτησιών ολοκληρώθηκε με επιτυχία!`);
+        console.log("Βήμα 3: Αποστολή αλλαγών στον server μία προς μία...");
+        let successCount = 0;
+        let errorCount = 0;
+        for (const change of changes) {
+            try {
+                await executeSync([change], appId);
+                successCount++;
+            } catch (error) {
+                errorCount++;
+                console.error(`Απέτυχε η αποθήκευση για την αλλαγή:`, change, error);
+            }
+        }
+        alert(`Η μαζική ανανέωση ιδιοκτησιών ολοκληρώθηκε.
+Επιτυχείς αλλαγές: ${successCount}
+Αποτυχημένες αλλαγές: ${errorCount}`);
 
     } catch (error) {
         console.error("--- ΚΡΙΣΙΜΟ ΣΦΑΛΜΑ ΚΑΤΑ ΤΗ ΜΑΖΙΚΗ ΑΝΑΝΕΩΣΗ ΙΔΙΟΚΤΗΣΙΩΝ ---", error);
