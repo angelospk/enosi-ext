@@ -273,7 +273,7 @@ export async function copyAgrotemaxioData(mainApplicationId: string) {
 
 
 /**
- * Copies the bioflag value from a source parcel to multiple target parcels.
+ * Copies the bioflag value and biological measure from a source parcel to multiple target parcels.
  * @param mainApplicationId - The main application ID (edeId).
  */
 export async function copyBioflagToTargets(mainApplicationId: string) {
@@ -296,14 +296,28 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
         console.log(`Available agrotemaxio kodikoi: ${availableKodikoi}`);
 
         // --- 2. Είσοδος Πηγής και Στόχων ---
-        const sourceKodikos = prompt(`Εισάγετε τον ΚΩΔΙΚΟ του αγροτεμαχίου-ΠΗΓΗΣ για το bioflag.`);
+        const sourceKodikos = prompt(`Εισάγετε τον ΚΩΔΙΚΟ του αγροτεμαχίου-ΠΗΓΗΣ για το bioflag και το βιολογικό μέτρο.`);
         if (!sourceKodikos || !agrotemaxiaMap.has(sourceKodikos)) {
             alert(`Σφάλμα: το αγροτεμάχιο-πηγή με κωδικό '${sourceKodikos}' δεν βρέθηκε.`);
             return;
         }
         const sourceAgrotemaxio: any = agrotemaxiaMap.get(sourceKodikos);
         const bioflagToCopy = sourceAgrotemaxio.bioflag;
-        // alert(`Η τιμή του bioflag που θα αντιγραφεί από τον κωδικό ${sourceKodikos} είναι: ${bioflagToCopy}`);
+
+        // --- 2.1 Ανάκτηση Βιολογικού Μέτρου Πηγής ---
+        console.log(`Fetching biological measure from source parcel ${sourceKodikos}...`);
+        const sourceBioMeasureResponse = await fetchApi('Edetedeaeeagroipaa/findAllByCriteriaRange_EdetedeaeeagroiGrpEdaaa', {
+            edaId_id: sourceAgrotemaxio.id,
+            gParams_yearEae: EAE_YEAR,
+            fromRowIndex: 0,
+            toRowIndex: 10
+        });
+        const sourceBioMeasure = (sourceBioMeasureResponse.data && sourceBioMeasureResponse.data.length > 0) ? sourceBioMeasureResponse.data[0] : null;
+        if (sourceBioMeasure) {
+            console.log(`Source parcel has a biological measure to copy:`, sourceBioMeasure);
+        } else {
+            console.log("Source parcel does not have a biological measure.");
+        }
 
         const targetKodikoiInput = prompt(`Εισάγετε τους ΚΩΔΙΚΟΥΣ των αγροτεμαχίων-ΣΤΟΧΩΝ, χωρισμένους με κόμμα:`);
         if (!targetKodikoiInput) {
@@ -314,6 +328,11 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
 
         // --- 3. Δημιουργία του πίνακα αλλαγών (changes) ---
         const changesToExecute: any[] = [];
+        const afm = await getAfmForApplication(mainApplicationId);
+        if (!afm) {
+            throw new Error("Δεν ήταν δυνατή η ανάκτηση του ΑΦΜ για την αίτηση.");
+        }
+
         for (const kodikos of targetKodikoi) {
             if (!agrotemaxiaMap.has(kodikos)) {
                 console.warn(`Ο στόχος με κωδικό ${kodikos} δεν βρέθηκε. Παράβλεψη.`);
@@ -325,21 +344,65 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
             }
 
             const targetAgrotemaxio: any = agrotemaxiaMap.get(kodikos);
-            if (targetAgrotemaxio.bioflag === bioflagToCopy) {
-                console.log(`Ο στόχος ${kodikos} έχει ήδη τη σωστή τιμή bioflag (${bioflagToCopy}). Παράβλεψη.`);
-                continue;
+
+            // --- 3.1: Ενημέρωση bioflag ---
+            if (targetAgrotemaxio.bioflag !== bioflagToCopy) {
+                console.log(`Updating bioflag for target ${kodikos} to ${bioflagToCopy}.`);
+                const updateEntity = {
+                    ...targetAgrotemaxio,
+                    bioflag: bioflagToCopy
+                };
+                changesToExecute.push({
+                    status: 1, // Update
+                    entityName: "Edetedeaeeagroi",
+                    entity: updateEntity
+                });
+            } else {
+                console.log(`Ο στόχος ${kodikos} έχει ήδη τη σωστή τιμή bioflag (${bioflagToCopy}). Παράβλεψη αλλαγής bioflag.`);
             }
 
-            const updateEntity = {
-                ...targetAgrotemaxio,
-                bioflag: bioflagToCopy
-            };
+            // --- 3.2: Αντιγραφή βιολογικού μέτρου ---
+            if (sourceBioMeasure) {
+                console.log(`Checking for existing measures on target ${kodikos}...`);
+                const targetBioMeasureResponse = await fetchApi('Edetedeaeeagroipaa/findAllByCriteriaRange_EdetedeaeeagroiGrpEdaaa', {
+                    edaId_id: targetAgrotemaxio.id,
+                    gParams_yearEae: EAE_YEAR,
+                    fromRowIndex: 0,
+                    toRowIndex: 10
+                });
 
-            changesToExecute.push({
-                status: 1, // Update
-                entityName: "Edetedeaeeagroi",
-                entity: updateEntity
-            });
+                if (targetBioMeasureResponse.data && targetBioMeasureResponse.data.length > 0) {
+                    console.warn(`Target ${kodikos} already has a biological measure. Skipping copy.`);
+                } else {
+                    console.log(`Adding biological measure to target ${kodikos}.`);
+                    const newBioMeasureEntity = {
+                        id: `TEMP_ID_${Date.now()}`,
+                        afm: afm,
+                        recordtype: 0,
+                        usrinsert: null,
+                        dteinsert: null,
+                        usrupdate: null,
+                        dteupdate: null,
+                        kodikos: 1, // First measure for this parcel
+                        eaaLt2: 2,
+                        remarks: null,
+                        rowVersion: null,
+                        datasourcetype: 2,
+                        etos: EAE_YEAR,
+                        edeId: { id: mainApplicationId },
+                        edaId: { id: targetAgrotemaxio.id },
+                        eaaId: { id: sourceBioMeasure.eaaId.id },
+                        sexId: null
+                    };
+
+                    changesToExecute.push({
+                        status: 0, // Create
+                        when: Date.now(),
+                        entityName: "Edetedeaeeagroipaa",
+                        entity: newBioMeasureEntity
+                    });
+                }
+            }
         }
 
         // --- 4. Έλεγχος και Εκτέλεση ---
@@ -348,15 +411,15 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
             return;
         }
 
-        // alert(`Προετοιμασία για την ενημέρωση του bioflag σε ${changesToExecute.length} αγροτεμάχια.`);
+        alert(`Προετοιμασία για την ενημέρωση ${changesToExecute.length} αλλαγών (bioflag και/ή βιολογικά μέτρα).`);
         
         const result = await executeSync(changesToExecute, mainApplicationId);
 
-        alert("Η διαδικασία ενημέρωσης του bioflag ολοκληρώθηκε με επιτυχία!");
+        alert("Η διαδικασία ενημέρωσης του bioflag και των βιολογικών μέτρων ολοκληρώθηκε με επιτυχία!");
         console.log("Server Response:", result);
 
     } catch (error) {
-        alert(`Προέκυψε σφάλμα κατά την αντιγραφή του bioflag: ${(error as Error).message}`);
+        alert(`Προέκυψε σφάλμα κατά την αντιγραφή: ${(error as Error).message}`);
         console.error("Full error details:", error);
     }
 } 
