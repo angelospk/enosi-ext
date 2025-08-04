@@ -328,6 +328,9 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
 
         // --- 3. Δημιουργία του πίνακα αλλαγών (changes) ---
         const changesToExecute: any[] = [];
+        const expiringRentals: any[] = [];
+        const cutoffDate = new Date(2028, 11, 1); // 1η Δεκεμβρίου 2028
+
         const afm = await getAfmForApplication(mainApplicationId);
         if (!afm) {
             throw new Error("Δεν ήταν δυνατή η ανάκτηση του ΑΦΜ για την αίτηση.");
@@ -374,20 +377,40 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
                 if (targetBioMeasureResponse.data && targetBioMeasureResponse.data.length > 0) {
                     console.warn(`Target ${kodikos} already has a biological measure. Skipping copy.`);
                 } else {
+                    // --- Έλεγχος Ιδιοκτησίας ΠΡΙΝ την προσθήκη του μέτρου ---
+                    console.log(`Checking ownerships for target ${kodikos} before adding bio measure...`);
+                    const ownershipResponse = await fetchApi('Edetedeaeeagroiem/findAllByCriteriaRange_EdetedeaeeagroiGrpEam', {
+                        edaId_id: targetAgrotemaxio.id,
+                        gParams_yearEae: EAE_YEAR,
+                        fromRowIndex: 0,
+                        toRowIndex: 50
+                    });
+                    const ownerships = ownershipResponse.data || [];
+
+                    for (const ownership of ownerships) {
+                        if (ownership.iemtype === 1 && ownership.dteenoikend) { // iemtype: 1 = Ενοικιαζόμενο
+                            const endDate = new Date(ownership.dteenoikend);
+                            if (endDate < cutoffDate) {
+                                expiringRentals.push({
+                                    kodikos: targetAgrotemaxio.kodikos,
+                                    afm: ownership.afmidiokthth,
+                                    endDate: endDate.toLocaleDateString('el-GR'),
+                                    ownershipId: ownership.id
+                                });
+                                console.log(`Found expiring rental for kodikos ${targetAgrotemaxio.kodikos}, AFM ${ownership.afmidiokthth}`);
+                            }
+                        }
+                    }
+
                     console.log(`Adding biological measure to target ${kodikos}.`);
                     const newBioMeasureEntity = {
                         id: `TEMP_ID_${Date.now()}`,
                         afm: afm,
                         recordtype: 0,
-                        usrinsert: null,
-                        dteinsert: null,
-                        usrupdate: null,
-                        dteupdate: null,
+                        usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
                         kodikos: 1, // First measure for this parcel
                         eaaLt2: 2,
-                        remarks: null,
-                        rowVersion: null,
-                        datasourcetype: 2,
+                        remarks: null, rowVersion: null, datasourcetype: 2,
                         etos: EAE_YEAR,
                         edeId: { id: mainApplicationId },
                         edaId: { id: targetAgrotemaxio.id },
@@ -414,6 +437,19 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
         alert(`Προετοιμασία για την ενημέρωση ${changesToExecute.length} αλλαγών (bioflag και/ή βιολογικά μέτρα).`);
         
         const result = await executeSync(changesToExecute, mainApplicationId);
+
+        // --- 5. Εμφάνιση Alert για ληγμένα ενοικιαστήρια ---
+        if (expiringRentals.length > 0) {
+            expiringRentals.sort((a, b) => a.afm.localeCompare(b.afm));
+
+            let alertMessage = "ΠΡΟΣΟΧΗ! Τα παρακάτω αγροτεμάχια στα οποία προστέθηκε βιολογικό μέτρο, έχουν ενοικιαστήρια που λήγουν πριν τον Δεκέμβριο του 2028:\n\n";
+            alertMessage += expiringRentals.map(item =>
+                `Κωδικός: ${item.kodikos}, ΑΦΜ Ιδιοκτήτη: ${item.afm}, Λήξη: ${item.endDate}`
+            ).join('\n');
+
+            console.log("Expiring rentals found:", expiringRentals);
+            alert(alertMessage);
+        }
 
         alert("Η διαδικασία ενημέρωσης του bioflag και των βιολογικών μέτρων ολοκληρώθηκε με επιτυχία!");
         console.log("Server Response:", result);
