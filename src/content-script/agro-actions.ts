@@ -437,15 +437,38 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
             }
         }
 
-        // --- 4. Έλεγχος και Εκτέλεση ---
+        // --- 4. Έλεγχος και Εκτέλεση μία προς μία ---
         if (changesToExecute.length === 0) {
             alert("Δεν απαιτούνται αλλαγές. Όλοι οι στόχοι είχαν ήδη τη σωστή τιμή ή ήταν άκυροι.");
             return;
         }
 
         alert(`Προετοιμασία για την ενημέρωση ${changesToExecute.length} αλλαγών (bioflag και/ή βιολογικά μέτρα).`);
-        
-        const result = await executeSync(changesToExecute, mainApplicationId);
+
+        let successCount = 0;
+        let errorCount = 0;
+        const errorDetails: string[] = [];
+
+        console.log("Αποστολή αλλαγών στον server μία προς μία...");
+        for (const change of changesToExecute) {
+            try {
+                await executeSync([change], mainApplicationId);
+                successCount++;
+                console.log('Επιτυχής αποθήκευση για την αλλαγή:', change);
+            } catch (error) {
+                errorCount++;
+                const entityIdentifier = change.entity.kodikos || change.entity.id;
+                const errorMessage = `Αποτυχία για ${change.entityName} στο αγροτεμάχιο με κωδικό/ID: ${entityIdentifier}`;
+                console.error(`${errorMessage}. Σφάλμα:`, error);
+                errorDetails.push(errorMessage);
+            }
+        }
+
+        let summaryMessage = `Η διαδικασία ολοκληρώθηκε.\n\nΕπιτυχείς αλλαγές: ${successCount}\nΑποτυχημένες αλλαγές: ${errorCount}`;
+        if (errorCount > 0) {
+            summaryMessage += `\n\nΓια λεπτομέρειες, ελέγξτε το console.`;
+        }
+        alert(summaryMessage);
 
         // --- 5. Εμφάνιση Alert για ληγμένα ενοικιαστήρια ---
         if (expiringRentals.length > 0) {
@@ -459,9 +482,6 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
             console.log("Expiring rentals found:", expiringRentals);
             alert(alertMessage);
         }
-
-        alert("Η διαδικασία ενημέρωσης του bioflag και των βιολογικών μέτρων ολοκληρώθηκε με επιτυχία!");
-        console.log("Server Response:", result);
 
     } catch (error) {
         alert(`Προέκυψε σφάλμα κατά την αντιγραφή: ${(error as Error).message}`);
