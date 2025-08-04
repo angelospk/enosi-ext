@@ -373,9 +373,15 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
                     fromRowIndex: 0,
                     toRowIndex: 10
                 });
+                const existingMeasures = targetBioMeasureResponse.data || [];
 
-                if (targetBioMeasureResponse.data && targetBioMeasureResponse.data.length > 0) {
-                    console.warn(`Target ${kodikos} already has a biological measure. Skipping copy.`);
+                // Φιλτράρουμε για να δούμε αν υπάρχουν άλλα μέτρα εκτός της εξισωτικής
+                const conflictingMeasures = existingMeasures.filter(
+                    (measure: any) => !measure.eaaId?.description?.includes('Αντισταθμιστική ενίσχυση')
+                );
+
+                if (conflictingMeasures.length > 0) {
+                    console.warn(`Target ${kodikos} already has a non-compensatory biological measure. Skipping copy.`);
                 } else {
                     // --- Έλεγχος Ιδιοκτησίας ΠΡΙΝ την προσθήκη του μέτρου ---
                     console.log(`Checking ownerships for target ${kodikos} before adding bio measure...`);
@@ -402,13 +408,16 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
                         }
                     }
 
-                    console.log(`Adding biological measure to target ${kodikos}.`);
+                    // Ο νέος κωδικός θα είναι ο αριθμός των υπαρχόντων μέτρων + 1
+                    const newKodikos = existingMeasures.length + 1;
+                    console.log(`Adding biological measure to target ${kodikos} with kodikos: ${newKodikos}.`);
+
                     const newBioMeasureEntity = {
                         id: `TEMP_ID_${Date.now()}`,
                         afm: afm,
                         recordtype: 0,
                         usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                        kodikos: 1, // First measure for this parcel
+                        kodikos: newKodikos,
                         eaaLt2: 2,
                         remarks: null, rowVersion: null, datasourcetype: 2,
                         etos: EAE_YEAR,
