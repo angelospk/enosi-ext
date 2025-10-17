@@ -15,8 +15,8 @@ export default {
   author: {
     email: "angelos.papamichail@gmail.com", // Update with your email
   },
-  name: "DNS Server", // Or your desired extension name
-  description: "Assists.",
+  name: "OSDE Helper", // Or your desired extension name
+  description: "supercharge the experience on the Greek OPEKEPE (EAE 2024) portal",
   version: `${major}.${minor}.${patch}.${label}`,
   version_name: version,
   manifest_version: 3,
