@@ -16,6 +16,7 @@ type UnusedParcel = {
   "ΑΤΑΚ": string;
   "Τοποθεσία": string;
   "Έκταση (Ha)": number;
+  "Κοινότητα": string;
 };
 
 // Συνάρτηση για την ανάκτηση ΟΛΩΝ των διαθέσιμων αγροτεμαχίων από την ΑΑΔΕ
@@ -128,6 +129,7 @@ export async function findUnusedParcels(afm: string, edeId: string): Promise<voi
       .filter((parcel: AadeParcel) => !usedAtakSet.has(parcel.atakStr))
       .map((item: AadeParcel) => ({
         "ΑΤΑΚ": item.atakStr,
+        "Κοινότητα": item.municDescr,
         "Τοποθεσία": item.address.trim(),
         "Έκταση (Ha)": getAreaHa(item)
       }))
@@ -147,10 +149,10 @@ export async function findUnusedParcels(afm: string, edeId: string): Promise<voi
     console.table(unusedParcels);
 
     // Έξοδος σε μορφή κειμένου για αντιγραφή σε Excel/Sheets
-    const header = "ΑΤΑΚ\tΤοποθεσία\tΈκταση (Ha)";
+    const header = "ΑΤΑΚ\tΚοινότητα\tΤοποθεσία\tΈκταση (Ha)";
     const tsvRows = unusedParcels.map((p: UnusedParcel) => {
       const formattedArea = p["Έκταση (Ha)"].toFixed(4).replace('.', ',');
-      return `${p.ΑΤΑΚ}\t${p.Τοποθεσία}\t${formattedArea}`;
+        return `${p.ΑΤΑΚ}\t${p.Κοινότητα}\t${p.Τοποθεσία}\t${formattedArea}`;
     });
     const tsvOutput = [header, ...tsvRows].join('\n');
 

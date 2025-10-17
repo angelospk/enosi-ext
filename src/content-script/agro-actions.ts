@@ -273,7 +273,7 @@ export async function copyAgrotemaxioData(mainApplicationId: string) {
 
 
 /**
- * Copies the bioflag value from a source parcel to multiple target parcels.
+ * Copies the bioflag value and biological measure from a source parcel to multiple target parcels.
  * @param mainApplicationId - The main application ID (edeId).
  */
 export async function copyBioflagToTargets(mainApplicationId: string) {
@@ -296,14 +296,28 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
         console.log(`Available agrotemaxio kodikoi: ${availableKodikoi}`);
 
         // --- 2. Είσοδος Πηγής και Στόχων ---
-        const sourceKodikos = prompt(`Εισάγετε τον ΚΩΔΙΚΟ του αγροτεμαχίου-ΠΗΓΗΣ για το bioflag.`);
+        const sourceKodikos = prompt(`Εισάγετε τον ΚΩΔΙΚΟ του αγροτεμαχίου-ΠΗΓΗΣ για το bioflag και το βιολογικό μέτρο.`);
         if (!sourceKodikos || !agrotemaxiaMap.has(sourceKodikos)) {
             alert(`Σφάλμα: το αγροτεμάχιο-πηγή με κωδικό '${sourceKodikos}' δεν βρέθηκε.`);
             return;
         }
         const sourceAgrotemaxio: any = agrotemaxiaMap.get(sourceKodikos);
         const bioflagToCopy = sourceAgrotemaxio.bioflag;
-        // alert(`Η τιμή του bioflag που θα αντιγραφεί από τον κωδικό ${sourceKodikos} είναι: ${bioflagToCopy}`);
+
+        // --- 2.1 Ανάκτηση Βιολογικού Μέτρου Πηγής ---
+        console.log(`Fetching biological measure from source parcel ${sourceKodikos}...`);
+        const sourceBioMeasureResponse = await fetchApi('Edetedeaeeagroipaa/findAllByCriteriaRange_EdetedeaeeagroiGrpEdaaa', {
+            edaId_id: sourceAgrotemaxio.id,
+            gParams_yearEae: EAE_YEAR,
+            fromRowIndex: 0,
+            toRowIndex: 10
+        });
+        const sourceBioMeasure = (sourceBioMeasureResponse.data && sourceBioMeasureResponse.data.length > 0) ? sourceBioMeasureResponse.data[0] : null;
+        if (sourceBioMeasure) {
+            console.log(`Source parcel has a biological measure to copy:`, sourceBioMeasure);
+        } else {
+            console.log("Source parcel does not have a biological measure.");
+        }
 
         const targetKodikoiInput = prompt(`Εισάγετε τους ΚΩΔΙΚΟΥΣ των αγροτεμαχίων-ΣΤΟΧΩΝ, χωρισμένους με κόμμα:`);
         if (!targetKodikoiInput) {
@@ -314,6 +328,14 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
 
         // --- 3. Δημιουργία του πίνακα αλλαγών (changes) ---
         const changesToExecute: any[] = [];
+        const expiringRentals: any[] = [];
+        const cutoffDate = new Date(2028, 11, 1); // 1η Δεκεμβρίου 2028
+
+        const afm = await getAfmForApplication(mainApplicationId);
+        if (!afm) {
+            throw new Error("Δεν ήταν δυνατή η ανάκτηση του ΑΦΜ για την αίτηση.");
+        }
+
         for (const kodikos of targetKodikoi) {
             if (!agrotemaxiaMap.has(kodikos)) {
                 console.warn(`Ο στόχος με κωδικό ${kodikos} δεν βρέθηκε. Παράβλεψη.`);
@@ -325,38 +347,144 @@ export async function copyBioflagToTargets(mainApplicationId: string) {
             }
 
             const targetAgrotemaxio: any = agrotemaxiaMap.get(kodikos);
-            if (targetAgrotemaxio.bioflag === bioflagToCopy) {
-                console.log(`Ο στόχος ${kodikos} έχει ήδη τη σωστή τιμή bioflag (${bioflagToCopy}). Παράβλεψη.`);
-                continue;
+
+            // --- 3.1: Ενημέρωση bioflag ---
+            if (targetAgrotemaxio.bioflag !== bioflagToCopy) {
+                console.log(`Updating bioflag for target ${kodikos} to ${bioflagToCopy}.`);
+                const updateEntity = {
+                    ...targetAgrotemaxio,
+                    bioflag: bioflagToCopy
+                };
+                changesToExecute.push({
+                    status: 1, // Update
+                    entityName: "Edetedeaeeagroi",
+                    entity: updateEntity
+                });
+            } else {
+                console.log(`Ο στόχος ${kodikos} έχει ήδη τη σωστή τιμή bioflag (${bioflagToCopy}). Παράβλεψη αλλαγής bioflag.`);
             }
 
-            const updateEntity = {
-                ...targetAgrotemaxio,
-                bioflag: bioflagToCopy
-            };
+            // --- 3.2: Αντιγραφή βιολογικού μέτρου ---
+            if (sourceBioMeasure) {
+                console.log(`Checking for existing measures on target ${kodikos}...`);
+                const targetBioMeasureResponse = await fetchApi('Edetedeaeeagroipaa/findAllByCriteriaRange_EdetedeaeeagroiGrpEdaaa', {
+                    edaId_id: targetAgrotemaxio.id,
+                    gParams_yearEae: EAE_YEAR,
+                    fromRowIndex: 0,
+                    toRowIndex: 10
+                });
+                const existingMeasures = targetBioMeasureResponse.data || [];
 
-            changesToExecute.push({
-                status: 1, // Update
-                entityName: "Edetedeaeeagroi",
-                entity: updateEntity
-            });
+                // Φιλτράρουμε για να δούμε αν υπάρχουν άλλα μέτρα εκτός της εξισωτικής
+                const conflictingMeasures = existingMeasures.filter(
+                    (measure: any) => !measure.eaaId?.description?.includes('Αντισταθμιστική ενίσχυση')
+                );
+
+                if (conflictingMeasures.length > 0) {
+                    console.warn(`Target ${kodikos} already has a non-compensatory biological measure. Skipping copy.`);
+                } else {
+                    // --- Έλεγχος Ιδιοκτησίας ΠΡΙΝ την προσθήκη του μέτρου ---
+                    console.log(`Checking ownerships for target ${kodikos} before adding bio measure...`);
+                    const ownershipResponse = await fetchApi('Edetedeaeeagroiem/findAllByCriteriaRange_EdetedeaeeagroiGrpEam', {
+                        edaId_id: targetAgrotemaxio.id,
+                        gParams_yearEae: EAE_YEAR,
+                        fromRowIndex: 0,
+                        toRowIndex: 50
+                    });
+                    const ownerships = ownershipResponse.data || [];
+
+                    for (const ownership of ownerships) {
+                        if (ownership.iemtype === 1 && ownership.dteenoikend) { // iemtype: 1 = Ενοικιαζόμενο
+                            const endDate = new Date(ownership.dteenoikend);
+                            if (endDate < cutoffDate) {
+                                expiringRentals.push({
+                                    kodikos: targetAgrotemaxio.kodikos,
+                                    afm: ownership.afmidiokthth,
+                                    endDate: endDate.toLocaleDateString('el-GR'),
+                                    ownershipId: ownership.id
+                                });
+                                console.log(`Found expiring rental for kodikos ${targetAgrotemaxio.kodikos}, AFM ${ownership.afmidiokthth}`);
+                            }
+                        }
+                    }
+
+                    // Ο νέος κωδικός θα είναι ο αριθμός των υπαρχόντων μέτρων + 1
+                    const newKodikos = existingMeasures.length + 1;
+                    console.log(`Adding biological measure to target ${kodikos} with kodikos: ${newKodikos}.`);
+
+                    const newBioMeasureEntity = {
+                        id: `TEMP_ID_${Date.now()}`,
+                        afm: afm,
+                        recordtype: 0,
+                        usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
+                        kodikos: newKodikos,
+                        eaaLt2: 2,
+                        remarks: null, rowVersion: null, datasourcetype: 2,
+                        etos: EAE_YEAR,
+                        edeId: { id: mainApplicationId },
+                        edaId: { id: targetAgrotemaxio.id },
+                        eaaId: { id: sourceBioMeasure.eaaId.id },
+                        sexId: null
+                    };
+
+                    changesToExecute.push({
+                        status: 0, // Create
+                        when: Date.now(),
+                        entityName: "Edetedeaeeagroipaa",
+                        entity: newBioMeasureEntity
+                    });
+                }
+            }
         }
 
-        // --- 4. Έλεγχος και Εκτέλεση ---
+        // --- 4. Έλεγχος και Εκτέλεση μία προς μία ---
         if (changesToExecute.length === 0) {
             alert("Δεν απαιτούνται αλλαγές. Όλοι οι στόχοι είχαν ήδη τη σωστή τιμή ή ήταν άκυροι.");
             return;
         }
 
-        // alert(`Προετοιμασία για την ενημέρωση του bioflag σε ${changesToExecute.length} αγροτεμάχια.`);
-        
-        const result = await executeSync(changesToExecute, mainApplicationId);
+        alert(`Προετοιμασία για την ενημέρωση ${changesToExecute.length} αλλαγών (bioflag και/ή βιολογικά μέτρα).`);
 
-        alert("Η διαδικασία ενημέρωσης του bioflag ολοκληρώθηκε με επιτυχία!");
-        console.log("Server Response:", result);
+        let successCount = 0;
+        let errorCount = 0;
+        const errorDetails: string[] = [];
+
+        console.log("Αποστολή αλλαγών στον server μία προς μία...");
+        for (const change of changesToExecute) {
+            try {
+                await executeSync([change], mainApplicationId);
+                successCount++;
+                console.log('Επιτυχής αποθήκευση για την αλλαγή:', change);
+            } catch (error) {
+                errorCount++;
+                const entityIdentifier = change.entity.kodikos || change.entity.id;
+                const errorMessage = `Αποτυχία για ${change.entityName} στο αγροτεμάχιο με κωδικό/ID: ${entityIdentifier}`;
+                console.error(`${errorMessage}. Σφάλμα:`, error);
+                errorDetails.push(errorMessage);
+            }
+        }
+
+        let summaryMessage = `Η διαδικασία ολοκληρώθηκε.\n\nΕπιτυχείς αλλαγές: ${successCount}\nΑποτυχημένες αλλαγές: ${errorCount}`;
+        if (errorCount > 0) {
+            summaryMessage += `\n\nΓια λεπτομέρειες, ελέγξτε το console.`;
+        }
+        alert(summaryMessage);
+
+        // --- 5. Εμφάνιση Alert για ληγμένα ενοικιαστήρια ---
+        if (expiringRentals.length > 0) {
+            expiringRentals.sort((a, b) => a.afm.localeCompare(b.afm));
+
+            let alertMessage = "ΠΡΟΣΟΧΗ! Τα παρακάτω αγροτεμάχια στα οποία προστέθηκε βιολογικό μέτρο, έχουν ενοικιαστήρια που λήγουν πριν τον Δεκέμβριο του 2028:\n\n";
+            alertMessage += expiringRentals.map(item =>
+                `Κωδικός: ${item.kodikos}, ΑΦΜ Ιδιοκτήτη: ${item.afm}, Λήξη: ${item.endDate}`
+            ).join('\n');
+
+            console.log("Expiring rentals found:", expiringRentals);
+            alert(alertMessage);
+        }
 
     } catch (error) {
-        alert(`Προέκυψε σφάλμα κατά την αντιγραφή του bioflag: ${(error as Error).message}`);
+        alert(`Προέκυψε σφάλμα κατά την αντιγραφή: ${(error as Error).message}`);
         console.error("Full error details:", error);
     }
 } 

@@ -8,6 +8,9 @@ import { fetchApi, synchronizeChanges, executeSync, EAE_YEAR, toApiDateFormat } 
 import { handleMassUpdateFromJson } from '../utils/general_info_adder';
 import { handleOwnershipCopy } from '../utils/copy_owner';
 import { findUnusedParcels } from '../utils/ownership_agroi';
+import { handleOwnershipRefresh } from '../utils/mass_update_ownerships';
+import { askGeminiAi } from '../utils/geminiai';
+import { info } from 'console';
 // import { handleOwnershipCopy } from '../utils/copy_owner'
 
 async function navigateToTab(tabText: string, requiredBaseUrlPath: string): Promise<boolean> {
@@ -163,7 +166,7 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
         break;
       }
-      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ενοικιαστηρίων:');
+      const input = prompt('Επικόλλησε το JSON εισόδου για μαζική ανανέωση ιδιοκτησιών:');
       if (!input) break;
       let jsonInput;
       try {
@@ -172,7 +175,8 @@ async function handleShortcut(event: KeyboardEvent) {
         alert('Μη έγκυρο JSON.');
         break;
       }
-      await handleOwnershipCopy(appId, jsonInput);
+      // await handleOwnershipCopy(appId, jsonInput);
+      await handleOwnershipRefresh(appId, jsonInput);
       break;
     case 'o': // Greek 'ο' might map to 'o'
     case 'ο':
@@ -187,6 +191,13 @@ async function handleShortcut(event: KeyboardEvent) {
         console.log('unusedParcels', unusedParcels);
       }
       break;
+    }
+    case '[':
+    {
+        const cleanedData = await getCleanedGeospatialData(appId, EAE_YEAR);
+        console.info(cleanedData);
+        console.info("Fields:", cleanedData.field_list);
+        break;
     }
     case 'μ':
     case 'm': {
@@ -218,32 +229,41 @@ async function handleShortcut(event: KeyboardEvent) {
       console.log('jsonInput', jsonInput);
       await handleMassUpdateFromJson(jsonInput, appId);
         await fetchApi('MainService/fetchOwnerAtakInfoFromAade?', { edeId: appId, forceUpdate: true, etos: EAE_YEAR });
-        const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
-        const afm = edehdResponse.data[0].afm;
-        const keaStore = useKeaStore();
-        const prevYearEdeResponse = await fetchApi('MainService/getEdesByAfm?', { str_afm: afm, str_UserType: keaStore.keaParams.gUserType, globalUserVat: keaStore.keaParams.globalUserVat, e_bi_gSubExt_id: keaStore.keaParams.e_bi_gSubExt_id, i_etos: EAE_YEAR - 1 });
-        const prevYearEdeId = prevYearEdeResponse.data[0].id;
-        const reportResponse = await fetchApi('Reports/ReportsBtnFrm_RepEdeCsBtn_action', { reportFormat: 1, BD_EDE_ID: prevYearEdeId, I_ETOS: EAE_YEAR - 1 });
-        const base64String = reportResponse.data;
-        const rawBinaryString = atob(base64String);
-        const len = rawBinaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = rawBinaryString.charCodeAt(i);
-        }
-        const fileBlob = new Blob([bytes], { type: 'application/json' });
-        const jsonData = JSON.parse(await fileBlob.text());
-        const cleanedData = cleanGeospatialData(jsonData);
+        // get cleaned data for previous year
+        const cleanedData = await getCleanedGeospatialData(appId, EAE_YEAR - 1);
         
-        const cleanedFileBlob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
-        const downloadUrl = window.URL.createObjectURL(cleanedFileBlob);
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `${afm}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
+      
+      console.info("Last year data", cleanedData);
+      console.info("Fields:", cleanedData.field_list);
+
+      // get error messages
+      let messages;
+      try {
+          const response = await fetch("https://eae2024.opekepe.gov.gr/eae2024/rest/MainService/checkAee?", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+            body: JSON.stringify({ etos: new Date().getFullYear(), edeId: appId }),
+            credentials: "include",
+          });
+
+      
+          messages = await response.json();
+        } catch (error: any) {
+          console.error("Error during message polling:", error);
+        } 
+        console.info("Messages", messages);
+       await askGeminiAi(cleanedData, messages);
+
+        // const cleanedFileBlob = new Blob([JSON.stringify(cleanedData, null, 2)], { type: 'application/json' });
+        // const downloadUrl = window.URL.createObjectURL(cleanedFileBlob);
+        // const link = document.createElement('a');
+        // link.href = downloadUrl;
+        // const afm= cleanedData.tin||appId;
+        // link.download = `${afm}.json`;
+        // document.body.appendChild(link);
+        // link.click();
+        // document.body.removeChild(link);
+        // window.URL.revokeObjectURL(downloadUrl);
       } catch (error) {
         alert(`Προέκυψε σφάλμα: ${(error as Error).message}`);
       }
@@ -304,20 +324,9 @@ async function handleShortcut(event: KeyboardEvent) {
     case '`': {
       // Ctrl + `
       try {
-        const input = prompt('Επικόλλησε το JSON εισόδου για μαζική αντιγραφή ενοικιαστηρίων:');
-        if (!input) break;
-        let jsonInput;
-        try {
-          jsonInput = JSON.parse(input);
-        } catch (e) {
-          alert('Μη έγκυρο JSON.');
-          break;
-        }
-        const appId = messageStore.currentApplicationId;
-        if (!appId) {
-          alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
-          break;
-        }
+
+      
+      const jsonInput = await getCleanedGeospatialData(appId, EAE_YEAR-1);
     
       await handleOwnershipCopy(appId, jsonInput);
       } catch (err) {

@@ -184,6 +184,18 @@
               />
             </div>
           </div>
+          <hr>
+          <h4>Ρυθμίσεις Gemini AI</h4>
+          <div class="setting-item-vertical">
+            <label for="gemini-api-key">Gemini API Key:</label>
+            <input
+              id="gemini-api-key"
+              v-model="settingsStore.geminiApiKey"
+              type="password"
+              style="width: 100%;"
+              placeholder="Εισάγετε το κλειδί σας"
+            />
+          </div>
         </div>
       </template>
     </div>

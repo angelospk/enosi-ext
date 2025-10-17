@@ -1,3 +1,5 @@
+import { useKeaStore } from '../stores/kea.store';
+import { fetchApi } from './api';
 /**
  * Removes geospatial data from the application's JSON structure to reduce file size.
  * @param data The application data object.
@@ -27,3 +29,31 @@ export function cleanGeospatialData(data: any): any {
 
     return data;
 }
+
+
+export async function getCleanedGeospatialData(appId: string, EAE_YEAR: number): Promise<any> {
+    if (!appId) {
+        alert('ID Αίτησης δεν έχει οριστεί. Ανανεώστε τη σελίδα πάνω σε μια αίτηση.');
+        return;
+    }
+    const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
+        const afm = edehdResponse.data[0].afm;
+        const keaStore = useKeaStore();
+        if (EAE_YEAR === 2024) {
+            const prevYearEdeResponse = await fetchApi('MainService/getEdesByAfm?', { str_afm: afm, str_UserType: keaStore.keaParams.gUserType, globalUserVat: keaStore.keaParams.globalUserVat, e_bi_gSubExt_id: keaStore.keaParams.e_bi_gSubExt_id, i_etos: EAE_YEAR});
+            const prevYearEdeId = prevYearEdeResponse.data[0].id;
+            appId = prevYearEdeId;
+        }
+        const reportResponse = await fetchApi('Reports/ReportsBtnFrm_RepEdeCsBtn_action', { reportFormat: 1, BD_EDE_ID: appId, I_ETOS: EAE_YEAR });
+        const base64String = reportResponse.data;
+        const rawBinaryString = atob(base64String);
+        const len = rawBinaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = rawBinaryString.charCodeAt(i);
+        }
+        const fileBlob = new Blob([bytes], { type: 'application/json' });
+        const jsonData = JSON.parse(await fileBlob.text());
+        const cleanedData = cleanGeospatialData(jsonData);
+        return cleanedData;
+}   

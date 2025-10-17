@@ -75,44 +75,79 @@ const CONSTANTS = {
 };
 
 
+let tempIdCounter = 0;
+const getTempId = () => `TEMP_ID_${Date.now()}_${tempIdCounter++}`;
+
+
 /**
- * "Ασφαλής" εκτέλεση ενός batch. Εκτελεί το batch μέσα σε ένα try...catch.
- * Αν αποτύχει, καταγράφει το σφάλμα και επιστρέφει false, αντί να σταματήσει το script.
- * @returns true αν το batch ήταν επιτυχές, false αν απέτυχε.
+ * [REFACTORED] "Ασφαλής" εκτέλεση ενός batch.
+ * Handles different endpoints and optional inclusion of the main Edehd entity.
+ * @param appId - The ID of the main application (Edetedeaeehd).
+ * @param changes - The array of entity changes to be submitted.
+ * @param endpoint - The API endpoint for synchronization.
+ * @param logMessage - A message for logging purposes.
+ * @param includeEdehd - If true, fetches, increments rowVersion, and adds Edehd to the batch.
+ * @returns true if the batch was successful, false if it failed.
  */
-async function executeSyncBatch(appId: string, changes: any[], endpoint: string, logMessage: string): Promise<boolean> {
+async function executeSyncBatch(appId: string, changes: any[], endpoint: string, logMessage: string, includeEdehd: boolean = true): Promise<boolean> {
     if (changes.length === 0) {
         console.log(`  -> Παράλειψη: ${logMessage} (δεν υπάρχουν αλλαγές).`);
         return true;
     }
 
     try {
-        console.log(`  -> Εκτέλεση: ${logMessage} (${changes.length} αλλαγές)...`);
-        const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
-        const cleanedEdehd = prepareEntityForRequest(edehdResponse.data[0]);
+        console.log(`  -> Εκτέλεση: ${logMessage} (${changes.length} αλλαγές) στο endpoint: ${endpoint}`);
 
+        // Prepare the new/updated entities *before* adding the Edehd
         const finalChanges = changes.map(change => ({
             ...change,
             entity: prepareEntityForRequest(change.entity)
         }));
 
-        finalChanges.push({
-            status: 1, when: 0, entityName: "Edetedeaeehd", entity: cleanedEdehd
-        });
+        // Conditionally add the main application header (Edehd)
+        if (includeEdehd) {
+            const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
+            const rawEdehd = edehdResponse.data[0];
+
+            if (!rawEdehd) {
+                throw new Error("Δεν ήταν δυνατή η ανάκτηση του Edehd για το batch.");
+            }
+
+            // Increment rowVersion for optimistic locking and clean the entity
+            const updatedEdehdEntity = {
+                ...rawEdehd,
+                rowVersion: (rawEdehd.rowVersion || 0) + 1 // Increment rowVersion
+            };
+            const cleanedEdehd = prepareEntityForRequest(updatedEdehdEntity);
+            
+            finalChanges.push({
+                status: 1, // Status 1 for Update
+                when: 0,   // 'when: 0' is a convention for the main entity in a batch
+                entityName: "Edetedeaeehd",
+                entity: cleanedEdehd
+            });
+        }
         
         const response = await fetchApi(endpoint, { params: { data: finalChanges } });
         
-        console.log(`     ...Ολοκληρώθηκε. Απάντηση:`, response);
+        console.log(`     ...Ολοκληρώθηκε.`, response);
         if (response && (response.warningMessages || response.errorMessages)) {
             console.warn(`     ...Προειδοποιήσεις/Σφάλματα από το server:`, response);
+             if (response.errorMessages) {
+                // Throw an error to stop the process if the server returns an explicit error message
+                throw new Error(`Server error in "${logMessage}": ${JSON.stringify(response.errorMessages)}`);
+            }
         }
         return true;
 
     } catch (error) {
         console.error(`--- ΣΦΑΛΜΑ στο βήμα: "${logMessage}" ---`, error);
+        // It's better to re-throw the error or handle it more gracefully
+        // For now, returning false to maintain original behavior.
         return false;
     }
 }
+
 
 /**
  * Εκτελεί μια μαζική ενημέρωση των γενικών στοιχείων, δικαιολογητικών και συμβάσεων
@@ -133,43 +168,41 @@ export async function handleMassUpdateFromJson(jsonInput: any, appId: string) {
         const isEpileximosAnadian = anadianResp.data?.[0]?.epileximosflag === true;
         
         const edehdResponse = await fetchApi('Edetedeaeehd/findById', { id: appId });
-        // Αποθηκεύουμε ολόκληρο το αντικείμενο { id: '...' } για να το χρησιμοποιούμε απευθείας.
-        const sexIdObject = edehdResponse.data[0].sexId ? { id: edehdResponse.data[0].sexId.$refId} : null;
+        const rawEdehdEntity = edehdResponse.data[0];
+        const sexIdObject = rawEdehdEntity.sexId ? { id: rawEdehdEntity.sexId.$refId} : null;
         if (!sexIdObject || !sexIdObject.id) {
             throw new Error("Δεν ήταν δυνατή η εύρεση του Subscriber ID (sexId) από την αίτηση.");
         }
-        const afm = edehdResponse.data[0].afm;
+        const afm = rawEdehdEntity.afm;
         
-        let tempIdCounter = 0;
-        const getTempId = () => `TEMP_ID_${Date.now()}_${tempIdCounter++}`;
+        // Helper to create a base entity object with common fields, reducing redundancy
+        const createBaseEntity = (kodikos: number) => ({
+            id: getTempId(),
+            afm: afm,
+            kodikos: kodikos,
+            etos: EAE_YEAR,
+            recordtype: 0,
+            edeId: { id: appId },
+            sexId: sexIdObject,
+        });
 
         // --- ΒΗΜΑ 1: Ενημέρωση Βασικών Στοιχείων Αίτησης (businessGroupFlag etc.) ---
-
-// Παίρνουμε το "ακατέργαστο" αντικείμενο από το fetch
-const rawEdehdEntity = edehdResponse.data[0];
-
-// *** Η ΚΡΙΣΙΜΗ ΔΙΟΡΘΩΣΗ ΕΙΝΑΙ ΕΔΩ ***
-// Το "καθαρίζουμε" χρησιμοποιώντας την έτοιμη helper function
-const cleanedEdehdEntity = prepareEntityForRequest(rawEdehdEntity);
-
-// Εφαρμόζουμε τις αλλαγές μας στο "καθαρό" αντικείμενο
-const entityForUpdate = {
-    ...cleanedEdehdEntity,
-    businessGroupFlag: 0,
-    entolheispflag: 1,
-    entolhxreflag: 0,
-    pendingelgaflag: 1
-};
-
-const initialEdehdUpdate = [{
-    status: 1,
-    when: Date.now(),
-    entityName: 'Edetedeaeehd',
-    entity: entityForUpdate
-}];
-
-        // Αυτή η κλήση δεν χρειάζεται την helper, γιατί το Edehd είναι ήδη μέσα.
         console.log("Βήμα 1: Ενημέρωση βασικών στοιχείων αίτησης...");
+        const entityForUpdate = {
+            ...rawEdehdEntity, // Start with the raw entity
+            businessGroupFlag: 0,
+            entolheispflag: 1,
+            entolhxreflag: 0,
+            pendingelgaflag: 1,
+            rowVersion: (rawEdehdEntity.rowVersion || 0) + 1 // Crucial: Increment rowVersion
+        };
+        const initialEdehdUpdate = [{
+            status: 1,
+            when: Date.now(),
+            entityName: 'Edetedeaeehd',
+            entity: prepareEntityForRequest(entityForUpdate)
+        }];
+
         await fetchApi('MainService/synchronizeChangesWithDb_Edetedeaeehd', { params: { data: initialEdehdUpdate }});
         console.log("  -> Ολοκληρώθηκε.");
 
@@ -184,14 +217,9 @@ const initialEdehdUpdate = [{
                 metraChanges.push({
                     status: 0, when: Date.now(), entityName: 'Edetedeaeepaa',
                     entity: {
-                        id: getTempId(), afm: afm, kodikos: metraKodikosCounter, etos: EAE_YEAR, eaaLt2: 2,
-                        recordtype: 0,
-                        edeId: { id: appId }, eaaId: { id: eaaId }, sexId: sexIdObject,
-                        usrinsert: null, dteinsert: null, usrupdate: null, dteupdate: null,
-                        arapof: null, dteapof: null, mmz: null, mmzaiges: null,
-                        mmzbookre: null, mmzboogal: null, afmspouse: null,
-                        lastnamespouse: null, firstnamespouse: null, fathernamespouse: null,
-                        remarks: null, rowVersion: null, eomId: null
+                        ...createBaseEntity(metraKodikosCounter),
+                        eaaLt2: 2,
+                        eaaId: { id: eaaId },
                     }
                 });
             });
@@ -207,94 +235,87 @@ const initialEdehdUpdate = [{
             requestsKodikosCounter++;
             requestChanges.push({
                 status: 0, when: Date.now(), entityName: 'Edetedeaeerequest',
-                entity: { id: getTempId(), afm: afm, kodikos: requestsKodikosCounter, etos: EAE_YEAR, recordtype: 0, eschLt2: 2, edeId: { id: appId }, eschId: { id: CONSTANTS.ESCH_IDS.ANADIANEMITIKI }, sexId: sexIdObject }
+                entity: {
+                    ...createBaseEntity(requestsKodikosCounter),
+                    eschLt2: 2,
+                    eschId: { id: CONSTANTS.ESCH_IDS.ANADIANEMITIKI },
+                }
             });
         }
         
         const syndedemenes = [ { flag: 'skliros_sitos', eschId: CONSTANTS.ESCH_IDS.SKLIROS_SITOS }, { flag: 'malakos_sitos', eschId: CONSTANTS.ESCH_IDS.MALAKOS_SITOS }, { flag: 'vamvaki', eschId: CONSTANTS.ESCH_IDS.VAMVAKI } ];
         syndedemenes.forEach(synd => {
             if (jsonInput[synd.flag]) {
-                // Βρίσκουμε τα στοιχεία του τιμολογίου από τον χρήστη ή παίρνουμε τα δοκιμαστικά.
                 const cropKey = synd.flag as keyof typeof CONSTANTS.DEFAULT_VARIETIES;
-                let timologioInfo = jsonInput.timologia?.find((t: any) => t.kalliergeia === cropKey);
-                if (!timologioInfo) {
-                    console.warn(`Δεν βρέθηκε τιμολόγιο για ${cropKey}. Δημιουργία δοκιμαστικού.`);
-                    timologioInfo = CONSTANTS.DEFAULT_TIMOLOGIA[cropKey];
-                }
-                 // Παίρνουμε ΠΑΝΤΑ την ποικιλία από τις σταθερές.
-                
+                const timologioInfo = jsonInput.timologia?.find((t: any) => t.kalliergeia === cropKey) || CONSTANTS.DEFAULT_TIMOLOGIA[cropKey];
+
                 const varietyInfo = CONSTANTS.DEFAULT_VARIETIES[cropKey];
                 requestsKodikosCounter++;
                 const requestTempId = getTempId();
-                // Δημιουργία Request
-                requestChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeerequest', entity: { id: requestTempId, afm: afm, kodikos: requestsKodikosCounter, etos: EAE_YEAR, eschLt2: 2, recordtype: 0, edeId: { id: appId }, eschId: { id: synd.eschId }, sexId: sexIdObject } });
                 
-                // Δημιουργία Sporos (με τη σταθερή ποικιλία)
-                requestChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeerequestsporo', entity: { id: getTempId(), afm: afm, kodikos: 1, etos: EAE_YEAR, recordtype: 0, sporosqty: timologioInfo.posotita, etiketes: timologioInfo.etiketes, edeId: { id: appId }, edrqId: { id: requestTempId }, eschId: { id: synd.eschId }, sexId: sexIdObject, efyId: { id: varietyInfo.efyId }, poiId: { id: varietyInfo.poiId } } });
-                
-                // Δημιουργία Invoice
-                requestChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeerequestinvoice', entity: { id: getTempId(), afm: afm, kodikos: 1, etos: EAE_YEAR, recordtype: 0, timologioafm: timologioInfo.afm, timologioname: timologioInfo.epwnymia, timologiodte: timologioInfo.hmerominia, edeId: { id: appId }, edrqId: { id: requestTempId }, sexId: sexIdObject } });
+                // Request
+                requestChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeerequest', entity: { ...createBaseEntity(requestsKodikosCounter), id: requestTempId, eschLt2: 2, eschId: { id: synd.eschId } } });
+                // Sporos
+                requestChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeerequestsporo', entity: { ...createBaseEntity(1), sporosqty: timologioInfo.posotita, etiketes: timologioInfo.etiketes, edrqId: { id: requestTempId }, eschId: { id: synd.eschId }, efyId: { id: varietyInfo.efyId }, poiId: { id: varietyInfo.poiId } } });
+                // Invoice
+                requestChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeerequestinvoice', entity: { ...createBaseEntity(1), timologioafm: timologioInfo.afm, timologioname: timologioInfo.epwnymia, timologiodte: timologioInfo.hmerominia, edrqId: { id: requestTempId } } });
             }
         });
         await executeSyncBatch(appId, requestChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeehd', 'Προσθήκη Άμεσων Ενισχύσεων');
         
         // --- ΒΗΜΑ 4: Προσθήκη Οικολογικών Σχημάτων ---
+        const ecoResp = await fetchApi('Edetedeaeeeco/findAllByCriteriaRange_EdetedeaeehdGrpEdeg_count', { edeId_id: appId, gParams_yearEae: EAE_YEAR, exc_Id: [] });
+        let ecoKodikosCounter = ecoResp.count;
         const ecoChanges: any[] = [];
+        
         if (jsonInput.lipasmata === true) {
+            ecoKodikosCounter++;
             const ecoTempId = getTempId();
-            ecoChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeeeco', entity: { id: ecoTempId, afm: afm, kodikos: 1, etos: EAE_YEAR, recordtype: 0, edeId: { id: appId }, esgrId: { id: CONSTANTS.ECO_SCHEME_IDS.LIPASMATA }, sexId: sexIdObject  } });
-            for (let i = 1; i <= 2; i++) { ecoChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeeecoinvoice', entity: { id: getTempId(), afm: afm, kodikos: i, etos: EAE_YEAR, recordtype: 0, timologioafm: " ", timologioname: " ", timologiodte: new Date().toISOString(), edeId: { id: appId }, edegId: { id: ecoTempId }, sexId: sexIdObject  } }); }
+            ecoChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeeeco', entity: { ...createBaseEntity(ecoKodikosCounter), id: ecoTempId, esgrId: { id: CONSTANTS.ECO_SCHEME_IDS.LIPASMATA } } });
+            for (let i = 1; i <= 2; i++) { ecoChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeeecoinvoice', entity: { ...createBaseEntity(i), timologioafm: " ", timologioname: " ", timologiodte: new Date().toISOString(), edegId: { id: ecoTempId } } }); }
         }
         if (jsonInput.viologiko === true) {
-            ecoChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeeeco', entity: { id: getTempId(), afm: afm, kodikos: 2, etos: EAE_YEAR, recordtype: 0, edeId: { id: appId }, esgrId: { id: CONSTANTS.ECO_SCHEME_IDS.VIOLOGIKO }, sexId: sexIdObject  } });
+            ecoKodikosCounter++;
+            ecoChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeeeco', entity: { ...createBaseEntity(ecoKodikosCounter), esgrId: { id: CONSTANTS.ECO_SCHEME_IDS.VIOLOGIKO } } });
         }
         await executeSyncBatch(appId, ecoChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeehd', 'Προσθήκη Οικολογικών Σχημάτων');
         
         // --- ΒΗΜΑ 5: Ενημέρωση GDPR ---
         const gdprIdsResp = await fetchApi('Edetedeaeegdpr/findAllByCriteriaRange_EdetedeaeehdGrpEdgdpr', { edeId_id: appId, gParams_yearEae: EAE_YEAR, fromRowIndex: 0, toRowIndex: 2000, exc_Id: [] });
         const gdprEntities = gdprIdsResp.data || [];
-        const gdprChanges = gdprEntities.map((rawGdprEntity: any) => {
-            // "Καθαρίζουμε" το κάθε αντικείμενο GDPR ξεχωριστά
-            const cleanedGdprEntity = prepareEntityForRequest(rawGdprEntity);
-            
-            // Εφαρμόζουμε την αλλαγή μας στο "καθαρό" αντικείμενο
-            const entityForUpdate = {
-                ...cleanedGdprEntity,
-                sygkatatheshflag: 1
-            };
-        
-            return {
-                status: 1, // Update
-                when: Date.now(),
-                entityName: 'Edetedeaeegdpr',
-                entity: entityForUpdate
-            };
-        });
+        const gdprChanges = gdprEntities.map((rawGdprEntity: any) => ({
+            status: 1, // Update
+            when: Date.now(),
+            entityName: 'Edetedeaeegdpr',
+            entity: { ...rawGdprEntity, sygkatatheshflag: 1 }
+        }));
         await executeSyncBatch(appId, gdprChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeehd', 'Ενημέρωση GDPR');
 
         // --- ΒΗΜΑ 6: Προσθήκη Σύμβασης Ηλίανθου ---
         if (jsonInput.hlianthos_sumbasi === true) {
             const contractChanges = [{
                 status: 0, when: Date.now(), entityName: 'Edetedeaeemetcom',
-                entity: { id: getTempId(), afm: afm, kodikos: 1, etos: EAE_YEAR, recordtype: 0, arsymbashmet: "1", dtesymbashmet: "2024-12-31T22:00:00.000Z", contractektash: 1, edeId: { id: appId }, emcId: { id: CONSTANTS.HLIANTHOS_IDS.EMC_ID }, efecId: { id: CONSTANTS.HLIANTHOS_IDS.EFEC_ID } }
+                entity: { ...createBaseEntity(1), arsymbashmet: "1", dtesymbashmet: "2024-12-31T22:00:00.000Z", contractektash: 1, emcId: { id: CONSTANTS.HLIANTHOS_IDS.EMC_ID }, efecId: { id: CONSTANTS.HLIANTHOS_IDS.EFEC_ID } }
             }];
-            await executeSyncBatch(appId, contractChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeemetcom', 'Προσθήκη Σύμβασης Ηλίανθου');
+            // Use the specific endpoint and set includeEdehd to false
+            await executeSyncBatch(appId, contractChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeemetcom', 'Προσθήκη Σύμβασης Ηλίανθου', false);
         }
 
         // --- ΒΗΜΑ 7: Προσθήκη Δικαιολογητικών ---
         const dikaiologitikaResp = await fetchApi('Edetedeaeedikaiol/findAllByCriteriaRange_EdetedeaeedikaiolGrpEdl_count', { g_Ede_id: appId, gParams_yearEae: EAE_YEAR, exc_Id: [] });
         let dikKodikosCounter = dikaiologitikaResp.count;
         const dikChanges: any[] = [];
-        const addDikaiologitiko = (edkId: string) => { dikKodikosCounter++; dikChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeedikaiol', entity: { id: getTempId(), afm: afm, kodikos: dikKodikosCounter, etos: EAE_YEAR, recordtype: 0, fileYear: EAE_YEAR, edeId: { id: appId }, edkId: { id: edkId } } }); };
+        const addDikaiologitiko = (edkId: string) => { dikKodikosCounter++; dikChanges.push({ status: 0, when: Date.now(), entityName: 'Edetedeaeedikaiol', entity: { ...createBaseEntity(dikKodikosCounter), fileYear: EAE_YEAR, edkId: { id: edkId } } }); };
         
         addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TAYTOPROSOPIA);
-        if (jsonInput.skliros_sitos === true) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.KARTELA_SKLIROY); addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TIMOLOGIO_SKLIROY); }
-        if (jsonInput.malakos_sitos === true) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.KARTELA_MALAKOY); addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TIMOLOGIO_MALAKOY); }
-        if (jsonInput.vamvaki === true) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.KARTELA_VAMVAKIOY); addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TIMOLOGIO_VAMVAKIOY); }
-        if (jsonInput.lipasmata === true) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.LIPASMATA); }
-        if (jsonInput.akrofysia === true) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.AKROFYSIA); }
+        if (jsonInput.skliros_sitos) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.KARTELA_SKLIROY); addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TIMOLOGIO_SKLIROY); }
+        if (jsonInput.malakos_sitos) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.KARTELA_MALAKOY); addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TIMOLOGIO_MALAKOY); }
+        if (jsonInput.vamvaki) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.KARTELA_VAMVAKIOY); addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.TIMOLOGIO_VAMVAKIOY); }
+        if (jsonInput.lipasmata) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.LIPASMATA); }
+        if (jsonInput.akrofysia) { addDikaiologitiko(CONSTANTS.DIKAIOLOGITIKA_IDS.AKROFYSIA); }
         
-        await executeSyncBatch(appId, dikChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeedikaiol', 'Προσθήκη Δικαιολογητικών');
+        // Use the specific endpoint and set includeEdehd to false
+        await executeSyncBatch(appId, dikChanges, 'MainService/synchronizeChangesWithDb_Edetedeaeedikaiol', 'Προσθήκη Δικαιολογητικών', false);
 
         alert("Η μαζική ενημέρωση ολοκληρώθηκε με επιτυχία!");
 

@@ -11,6 +11,7 @@ declare global {
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
   const appRouter: typeof import('../utils/router/index')['appRouter']
   const applyTheme: typeof import('../composables/useTheme')['applyTheme']
+  const askGeminiAi: typeof import('../utils/geminiai')['askGeminiAi']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarGroupInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['avatarGroupInjectionKey']
@@ -58,11 +59,13 @@ declare global {
   const formLoadingInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formLoadingInjectionKey']
   const formOptionsInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formOptionsInjectionKey']
   const getActivePinia: typeof import('pinia')['getActivePinia']
+  const getCleanedGeospatialData: typeof import('../utils/json_cleaner')['getCleanedGeospatialData']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const h: typeof import('vue')['h']
   const handleMassUpdateFromJson: typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']
   const handleOwnershipCopy: typeof import('../utils/copy_owner')['handleOwnershipCopy']
+  const handleOwnershipRefresh: typeof import('../utils/mass_update_ownerships')['handleOwnershipRefresh']
   const handleOwnershipTry: typeof import('../utils/copy_owner_old')['handleOwnershipTry']
   const handleShortcut: typeof import('../utils/shortcut-manager')['handleShortcut']
   const i18n: typeof import('../utils/i18n')['i18n']
@@ -415,6 +418,7 @@ declare module 'vue' {
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly appRouter: UnwrapRef<typeof import('../utils/router/index')['appRouter']>
     readonly applyTheme: UnwrapRef<typeof import('../composables/useTheme')['applyTheme']>
+    readonly askGeminiAi: UnwrapRef<typeof import('../utils/geminiai')['askGeminiAi']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarGroupInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['avatarGroupInjectionKey']>
@@ -462,11 +466,13 @@ declare module 'vue' {
     readonly formLoadingInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formLoadingInjectionKey']>
     readonly formOptionsInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formOptionsInjectionKey']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
+    readonly getCleanedGeospatialData: UnwrapRef<typeof import('../utils/json_cleaner')['getCleanedGeospatialData']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly handleMassUpdateFromJson: UnwrapRef<typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']>
     readonly handleOwnershipCopy: UnwrapRef<typeof import('../utils/copy_owner')['handleOwnershipCopy']>
+    readonly handleOwnershipRefresh: UnwrapRef<typeof import('../utils/mass_update_ownerships')['handleOwnershipRefresh']>
     readonly i18n: UnwrapRef<typeof import('../utils/i18n')['i18n']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
