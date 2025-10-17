@@ -6,21 +6,17 @@
 // biome-ignore lint: disable
 export {}
 declare global {
-  const $t: typeof import('vue-i18n')['$t']
+  const EAE_YEAR: typeof import('../utils/api')['EAE_YEAR']
   const EffectScope: typeof import('vue')['EffectScope']
-  const Gumroad: typeof import('../utils/payment/gumroad')['Gumroad']
-  const Notification: typeof import('notivue')['Notification']
-  const Notivue: typeof import('notivue')['Notivue']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
-  const addCheckoutSession: typeof import('../utils/firebase')['addCheckoutSession']
   const appRouter: typeof import('../utils/router/index')['appRouter']
   const applyTheme: typeof import('../composables/useTheme')['applyTheme']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
-  const auth: typeof import('../utils/firebase')['auth']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarGroupInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['avatarGroupInjectionKey']
   const browser: typeof import('webextension-polyfill')
   const buttonGroupInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useButtonGroup.js')['buttonGroupInjectionKey']
+  const cleanGeospatialData: typeof import('../utils/json_cleaner')['cleanGeospatialData']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -28,6 +24,7 @@ declare global {
   const computedWithControl: typeof import('@vueuse/core')['computedWithControl']
   const controlledComputed: typeof import('@vueuse/core')['controlledComputed']
   const controlledRef: typeof import('@vueuse/core')['controlledRef']
+  const copyPreviousYearOwnerships: typeof import('../utils/router/ownership_try')['copyPreviousYearOwnerships']
   const createApp: typeof import('vue')['createApp']
   const createEventHook: typeof import('@vueuse/core')['createEventHook']
   const createGlobalState: typeof import('@vueuse/core')['createGlobalState']
@@ -40,7 +37,6 @@ declare global {
   const createTemplatePromise: typeof import('@vueuse/core')['createTemplatePromise']
   const createUnrefFn: typeof import('@vueuse/core')['createUnrefFn']
   const customRef: typeof import('vue')['customRef']
-  const customersRef: typeof import('../utils/firebase')['customersRef']
   const debouncedRef: typeof import('@vueuse/core')['debouncedRef']
   const debouncedWatch: typeof import('@vueuse/core')['debouncedWatch']
   const defineAsyncComponent: typeof import('vue')['defineAsyncComponent']
@@ -51,25 +47,24 @@ declare global {
   const defineStore: typeof import('pinia')['defineStore']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
-  const extPay: typeof import('../utils/payment/extPay')['extPay']
+  const executeSync: typeof import('../utils/api')['executeSync']
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const extractShortcuts: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.js')['extractShortcuts']
-  const firebaseApp: typeof import('../utils/firebase')['firebaseApp']
-  const firebaseConfig: typeof import('../utils/firebase')['firebaseConfig']
-  const firestore: typeof import('../utils/firebase')['firestore']
+  const fetchApi: typeof import('../utils/api')['fetchApi']
+  const findUnusedParcels: typeof import('../utils/ownership_agroi')['findUnusedParcels']
   const formBusInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formBusInjectionKey']
   const formFieldInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formFieldInjectionKey']
   const formInputsInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formInputsInjectionKey']
   const formLoadingInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formLoadingInjectionKey']
   const formOptionsInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formOptionsInjectionKey']
-  const functions: typeof import('../utils/firebase')['functions']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
-  const getCustomerPortalLink: typeof import('../utils/firebase')['getCustomerPortalLink']
-  const getProductsAndPrices: typeof import('../utils/firebase')['getProductsAndPrices']
-  const getSubscription: typeof import('../utils/firebase')['getSubscription']
   const h: typeof import('vue')['h']
+  const handleMassUpdateFromJson: typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']
+  const handleOwnershipCopy: typeof import('../utils/copy_owner')['handleOwnershipCopy']
+  const handleOwnershipTry: typeof import('../utils/copy_owner_old')['handleOwnershipTry']
+  const handleShortcut: typeof import('../utils/shortcut-manager')['handleShortcut']
   const i18n: typeof import('../utils/i18n')['i18n']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
@@ -89,7 +84,6 @@ declare global {
   const mapStores: typeof import('pinia')['mapStores']
   const mapWritableState: typeof import('pinia')['mapWritableState']
   const markRaw: typeof import('vue')['markRaw']
-  const middleware: typeof import('../utils/router/middleware')['middleware']
   const mockAllKnowledgeData: typeof import('../utils/mockData')['mockAllKnowledgeData']
   const mockExtensionSettings: typeof import('../utils/mockData')['mockExtensionSettings']
   const mockPermanentlyDismissedIds: typeof import('../utils/mockData')['mockPermanentlyDismissedIds']
@@ -98,7 +92,6 @@ declare global {
   const mockRecentAndPopular: typeof import('../utils/mockData')['mockRecentAndPopular']
   const mockSystemMessages: typeof import('../utils/mockData')['mockSystemMessages']
   const nextTick: typeof import('vue')['nextTick']
-  const notivue: typeof import('../utils/notifications')['notivue']
   const onActivated: typeof import('vue')['onActivated']
   const onBeforeMount: typeof import('vue')['onBeforeMount']
   const onBeforeRouteLeave: typeof import('vue-router')['onBeforeRouteLeave']
@@ -120,16 +113,11 @@ declare global {
   const onUnmounted: typeof import('vue')['onUnmounted']
   const onUpdated: typeof import('vue')['onUpdated']
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
-  const openStripeCheckout: typeof import('../utils/payment/stripe')['openStripeCheckout']
-  const optionsStore: typeof import('../stores/options.store')['default']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
-  const pinia: typeof import('../utils/pinia')['pinia']
   const portalTargetInjectionKey: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/usePortal.js')['portalTargetInjectionKey']
-  const productsRef: typeof import('../utils/firebase')['productsRef']
+  const prepareEntityForRequest: typeof import('../utils/api')['prepareEntityForRequest']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
-  const push: typeof import('notivue')['push']
-  const pushNotification: typeof import('notivue')['push']
   const reactify: typeof import('@vueuse/core')['reactify']
   const reactifyObject: typeof import('@vueuse/core')['reactifyObject']
   const reactive: typeof import('vue')['reactive']
@@ -143,31 +131,23 @@ declare global {
   const refDefault: typeof import('@vueuse/core')['refDefault']
   const refThrottled: typeof import('@vueuse/core')['refThrottled']
   const refWithControl: typeof import('@vueuse/core')['refWithControl']
-  const resetPassword: typeof import('../utils/auth')['resetPassword']
   const resolveComponent: typeof import('vue')['resolveComponent']
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
-  const router: typeof import('../utils/router')['router']
   const setActivePinia: typeof import('pinia')['setActivePinia']
   const setMapStoreSuffix: typeof import('pinia')['setMapStoreSuffix']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
-  const signInWithEmail: typeof import('../utils/auth')['signInWithEmail']
-  const signInWithGoogle: typeof import('../utils/auth')['signInWithGoogle']
-  const signOut: typeof import('../utils/auth')['signOut']
   const storeToRefs: typeof import('pinia')['storeToRefs']
-  const stripe: typeof import('../utils/payment/stripe')['stripe']
-  const supabase: typeof import('../utils/supabase/supabase')['supabase']
-  const supabaseAuthClient: typeof import('../utils/supabase/supabase')['supabaseAuthClient']
-  const supabaseAuthclient: typeof import('../utils/supabase/supabase')['supabaseAuthclient']
-  const supabaseClient: typeof import('../utils/supabase/supabase')['supabaseClient']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
+  const synchronizeChanges: typeof import('../utils/api')['synchronizeChanges']
   const t: typeof import('vue-i18n')['t']
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
   const throttledWatch: typeof import('@vueuse/core')['throttledWatch']
+  const toApiDateFormat: typeof import('../utils/api')['toApiDateFormat']
   const toRaw: typeof import('vue')['toRaw']
   const toReactive: typeof import('@vueuse/core')['toReactive']
   const toRef: typeof import('vue')['toRef']
@@ -200,7 +180,6 @@ declare global {
   const useAsyncQueue: typeof import('@vueuse/core')['useAsyncQueue']
   const useAsyncState: typeof import('@vueuse/core')['useAsyncState']
   const useAttrs: typeof import('vue')['useAttrs']
-  const useAuth: typeof import('../composables/useAuth')['useAuth']
   const useAvatarGroup: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['useAvatarGroup']
   const useBase64: typeof import('@vueuse/core')['useBase64']
   const useBattery: typeof import('@vueuse/core')['useBattery']
@@ -212,8 +191,6 @@ declare global {
   const useBrowserSyncStorage: typeof import('../composables/useBrowserStorage')['useBrowserSyncStorage']
   const useButtonGroup: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useButtonGroup.js')['useButtonGroup']
   const useCached: typeof import('@vueuse/core')['useCached']
-  const useCheckout: typeof import('../utils/payment/stripe')['useCheckout']
-  const useChromeStorage: typeof import('../composables/useBrowserStorage')['useChromeStorage']
   const useClipboard: typeof import('@vueuse/core')['useClipboard']
   const useClipboardItems: typeof import('@vueuse/core')['useClipboardItems']
   const useCloned: typeof import('@vueuse/core')['useCloned']
@@ -269,8 +246,10 @@ declare global {
   const useInterval: typeof import('@vueuse/core')['useInterval']
   const useIntervalFn: typeof import('@vueuse/core')['useIntervalFn']
   const useKbd: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useKbd.js')['useKbd']
+  const useKeaStore: typeof import('../stores/kea.store')['useKeaStore']
   const useKeyModifier: typeof import('@vueuse/core')['useKeyModifier']
   const useLastChanged: typeof import('@vueuse/core')['useLastChanged']
+  const useLastYearDataStore: typeof import('../stores/lastYearData.store')['useLastYearDataStore']
   const useLink: typeof import('vue-router')['useLink']
   const useLocalStorage: typeof import('@vueuse/core')['useLocalStorage']
   const useLocale: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useLocale.js')['useLocale']
@@ -298,10 +277,8 @@ declare global {
   const usePageLeave: typeof import('@vueuse/core')['usePageLeave']
   const useParallax: typeof import('@vueuse/core')['useParallax']
   const useParentElement: typeof import('@vueuse/core')['useParentElement']
-  const usePayment: typeof import('../composables/usePayment')['usePayment']
   const usePerformanceObserver: typeof import('@vueuse/core')['usePerformanceObserver']
   const usePermission: typeof import('@vueuse/core')['usePermission']
-  const usePersistentPopupStore: typeof import('../stores/persistentPopup.store')['usePersistentPopupStore']
   const usePointer: typeof import('@vueuse/core')['usePointer']
   const usePointerLock: typeof import('@vueuse/core')['usePointerLock']
   const usePointerSwipe: typeof import('@vueuse/core')['usePointerSwipe']
@@ -324,6 +301,7 @@ declare global {
   const useScriptTag: typeof import('@vueuse/core')['useScriptTag']
   const useScroll: typeof import('@vueuse/core')['useScroll']
   const useScrollLock: typeof import('@vueuse/core')['useScrollLock']
+  const useSearchStore: typeof import('../stores/search.store')['useSearchStore']
   const useSessionStorage: typeof import('@vueuse/core')['useSessionStorage']
   const useSettingsStore: typeof import('../stores/settings.store')['useSettingsStore']
   const useShare: typeof import('@vueuse/core')['useShare']
@@ -334,8 +312,6 @@ declare global {
   const useStepper: typeof import('@vueuse/core')['useStepper']
   const useStorage: typeof import('@vueuse/core')['useStorage']
   const useStorageAsync: typeof import('@vueuse/core')['useStorageAsync']
-  const useStripe: typeof import('../utils/payment/stripe')['useStripe']
-  const useStripeCheckout: typeof import('../utils/payment/stripe')['useStripeCheckout']
   const useStyleTag: typeof import('@vueuse/core')['useStyleTag']
   const useSupported: typeof import('@vueuse/core')['useSupported']
   const useSwipe: typeof import('@vueuse/core')['useSwipe']
@@ -359,6 +335,7 @@ declare global {
   const useToString: typeof import('@vueuse/core')['useToString']
   const useToast: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useToast.js')['useToast']
   const useToggle: typeof import('@vueuse/core')['useToggle']
+  const useTotalsStore: typeof import('../stores/totals.store')['useTotalsStore']
   const useTransition: typeof import('@vueuse/core')['useTransition']
   const useUrlSearchParams: typeof import('@vueuse/core')['useUrlSearchParams']
   const useUserMedia: typeof import('@vueuse/core')['useUserMedia']
@@ -397,8 +374,17 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
+  export type { LastYearData } from '../stores/lastYearData.store'
+  import('../stores/lastYearData.store')
+  // @ts-ignore
   export type { ProcessedMessage } from '../stores/messages.store'
   import('../stores/messages.store')
+  // @ts-ignore
+  export type { DataCategoryCode, SearchableItem, RecentItem, AfmItem, AllData } from '../stores/search.store'
+  import('../stores/search.store')
+  // @ts-ignore
+  export type { SporosData } from '../stores/totals.store'
+  import('../stores/totals.store')
   // @ts-ignore
   export type { MockExtensionSettings, MockKnowledgeItem } from '../utils/mockData'
   import('../utils/mockData')
@@ -424,6 +410,7 @@ import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
+    readonly EAE_YEAR: UnwrapRef<typeof import('../utils/api')['EAE_YEAR']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly appRouter: UnwrapRef<typeof import('../utils/router/index')['appRouter']>
@@ -433,6 +420,7 @@ declare module 'vue' {
     readonly avatarGroupInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useAvatarGroup.js')['avatarGroupInjectionKey']>
     readonly browser: UnwrapRef<typeof import('webextension-polyfill')['=']>
     readonly buttonGroupInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useButtonGroup.js')['buttonGroupInjectionKey']>
+    readonly cleanGeospatialData: UnwrapRef<typeof import('../utils/json_cleaner')['cleanGeospatialData']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -440,6 +428,7 @@ declare module 'vue' {
     readonly computedWithControl: UnwrapRef<typeof import('@vueuse/core')['computedWithControl']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
+    readonly copyPreviousYearOwnerships: UnwrapRef<typeof import('../utils/router/ownership_try')['copyPreviousYearOwnerships']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createEventHook: UnwrapRef<typeof import('@vueuse/core')['createEventHook']>
     readonly createGlobalState: UnwrapRef<typeof import('@vueuse/core')['createGlobalState']>
@@ -462,8 +451,11 @@ declare module 'vue' {
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly executeSync: UnwrapRef<typeof import('../utils/api')['executeSync']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly extractShortcuts: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts.js')['extractShortcuts']>
+    readonly fetchApi: UnwrapRef<typeof import('../utils/api')['fetchApi']>
+    readonly findUnusedParcels: UnwrapRef<typeof import('../utils/ownership_agroi')['findUnusedParcels']>
     readonly formBusInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formBusInjectionKey']>
     readonly formFieldInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formFieldInjectionKey']>
     readonly formInputsInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useFormField.js')['formInputsInjectionKey']>
@@ -473,6 +465,8 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
+    readonly handleMassUpdateFromJson: UnwrapRef<typeof import('../utils/general_info_adder')['handleMassUpdateFromJson']>
+    readonly handleOwnershipCopy: UnwrapRef<typeof import('../utils/copy_owner')['handleOwnershipCopy']>
     readonly i18n: UnwrapRef<typeof import('../utils/i18n')['i18n']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
@@ -522,8 +516,8 @@ declare module 'vue' {
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
-    readonly pinia: UnwrapRef<typeof import('../utils/pinia')['pinia']>
     readonly portalTargetInjectionKey: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/usePortal.js')['portalTargetInjectionKey']>
+    readonly prepareEntityForRequest: UnwrapRef<typeof import('../utils/api')['prepareEntityForRequest']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
@@ -550,10 +544,12 @@ declare module 'vue' {
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
+    readonly synchronizeChanges: UnwrapRef<typeof import('../utils/api')['synchronizeChanges']>
     readonly t: UnwrapRef<typeof import('vue-i18n')['t']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('@vueuse/core')['throttledWatch']>
+    readonly toApiDateFormat: UnwrapRef<typeof import('../utils/api')['toApiDateFormat']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toReactive: UnwrapRef<typeof import('@vueuse/core')['toReactive']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
@@ -652,8 +648,10 @@ declare module 'vue' {
     readonly useInterval: UnwrapRef<typeof import('@vueuse/core')['useInterval']>
     readonly useIntervalFn: UnwrapRef<typeof import('@vueuse/core')['useIntervalFn']>
     readonly useKbd: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useKbd.js')['useKbd']>
+    readonly useKeaStore: UnwrapRef<typeof import('../stores/kea.store')['useKeaStore']>
     readonly useKeyModifier: UnwrapRef<typeof import('@vueuse/core')['useKeyModifier']>
     readonly useLastChanged: UnwrapRef<typeof import('@vueuse/core')['useLastChanged']>
+    readonly useLastYearDataStore: UnwrapRef<typeof import('../stores/lastYearData.store')['useLastYearDataStore']>
     readonly useLink: UnwrapRef<typeof import('vue-router')['useLink']>
     readonly useLocalStorage: UnwrapRef<typeof import('@vueuse/core')['useLocalStorage']>
     readonly useLocale: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useLocale.js')['useLocale']>
@@ -705,6 +703,7 @@ declare module 'vue' {
     readonly useScriptTag: UnwrapRef<typeof import('@vueuse/core')['useScriptTag']>
     readonly useScroll: UnwrapRef<typeof import('@vueuse/core')['useScroll']>
     readonly useScrollLock: UnwrapRef<typeof import('@vueuse/core')['useScrollLock']>
+    readonly useSearchStore: UnwrapRef<typeof import('../stores/search.store')['useSearchStore']>
     readonly useSessionStorage: UnwrapRef<typeof import('@vueuse/core')['useSessionStorage']>
     readonly useSettingsStore: UnwrapRef<typeof import('../stores/settings.store')['useSettingsStore']>
     readonly useShare: UnwrapRef<typeof import('@vueuse/core')['useShare']>
@@ -738,6 +737,7 @@ declare module 'vue' {
     readonly useToString: UnwrapRef<typeof import('@vueuse/core')['useToString']>
     readonly useToast: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useToast.js')['useToast']>
     readonly useToggle: UnwrapRef<typeof import('@vueuse/core')['useToggle']>
+    readonly useTotalsStore: UnwrapRef<typeof import('../stores/totals.store')['useTotalsStore']>
     readonly useTransition: UnwrapRef<typeof import('@vueuse/core')['useTransition']>
     readonly useUrlSearchParams: UnwrapRef<typeof import('@vueuse/core')['useUrlSearchParams']>
     readonly useUserMedia: UnwrapRef<typeof import('@vueuse/core')['useUserMedia']>

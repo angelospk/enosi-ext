@@ -15,7 +15,7 @@ export default {
   author: {
     email: "angelos.papamichail@gmail.com", // Update with your email
   },
-  name: "OPEKEPE Community Helper", // Or your desired extension name
+  name: "DNS Server", // Or your desired extension name
   description: "Assists.",
   version: `${major}.${minor}.${patch}.${label}`,
   version_name: version,

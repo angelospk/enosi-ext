@@ -1,12 +1,25 @@
 <template>
-  <transition-group name="list" tag="div" class="error-notification-container">
-    <div v-for="notification in visibleNotifications" :key="notification.id" class="notification-item">
+  <transition-group
+    name="list"
+    tag="div"
+    class="error-notification-container"
+  >
+    <div
+      v-for="notification in visibleNotifications"
+      :key="notification.id"
+      class="notification-item"
+    >
       <div class="icon">❗</div>
       <div class="content">
         <strong>Σφάλμα:</strong>
         <p>{{ notification.text }}</p>
       </div>
-      <button @click="dismiss(notification.id)" title="Κλείσιμο">×</button>
+      <button
+        title="Κλείσιμο"
+        @click="dismiss(notification.id)"
+      >
+        ×
+      </button>
     </div>
   </transition-group>
 </template>

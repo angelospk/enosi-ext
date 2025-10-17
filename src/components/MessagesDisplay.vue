@@ -1,5 +1,15 @@
 <template>
   <div class="messages-display-container">
+    <!-- Filter Input -->
+    <div class="filter-wrapper">
+      <input
+        v-model="filterQuery"
+        type="text"
+        placeholder="Φιλτράρισμα μηνυμάτων..."
+        class="filter-input"
+      >
+    </div>
+
     <!-- UI relies directly on the store's state -->
     <div
       v-if="messageStore.isLoading && messageStore.messages.length === 0 && messageStore.currentApplicationId"
@@ -14,7 +24,7 @@
       Δεν έχει επιλεγεί αίτηση για εμφάνιση μηνυμάτων.
     </div>
     <div
-      v-else-if="visibleMessages.length === 0 && permanentlyDismissedMessages.length === 0"
+      v-else-if="filteredMessages.length === 0 && permanentlyDismissedMessages.length === 0"
       class="no-messages"
     >
       Δεν υπάρχουν μηνύματα συστήματος για αυτή την αίτηση.
@@ -22,29 +32,56 @@
 
     <template v-if="messageStore.currentApplicationId">
       <!-- Section for Visible Messages -->
-      <section v-if="visibleMessages.length > 0">
+      <section v-if="filteredMessages.length > 0">
         <ul>
-          <li v-for="msg in visibleMessages" :key="msg.id">
+          <li
+            v-for="msg in filteredMessages"
+            :key="msg.id"
+          >
             <p v-html="formatMessageText(msg.rawText)"></p>
             <div class="actions">
-              <button title="Απόκρυψη για αυτή τη φορά" @click="messageStore.dismissMessageOnce(msg.id)">Αγνόηση</button>
-              <button title="Μόνιμη απόκρυψη αυτού του μηνύματος" @click="dismissPermanently(msg)">Αγνόηση για πάντα</button>
+              <button
+                title="Απόκρυψη για αυτή τη φορά"
+                @click="messageStore.dismissMessageOnce(msg.id)"
+              >
+                Αγνόηση
+              </button>
+              <button
+                title="Μόνιμη απόκρυψη αυτού του μηνύματος"
+                @click="dismissPermanently(msg)"
+              >
+                Αγνόηση για πάντα
+              </button>
             </div>
           </li>
         </ul>
       </section>
 
       <!-- Section for Permanently Dismissed Messages -->
-      <section v-if="permanentlyDismissedMessages.length > 0" class="message-section dismissed">
-        <h5 @click="showDismissed = !showDismissed" style="cursor:pointer;">
+      <section
+        v-if="permanentlyDismissedMessages.length > 0"
+        class="message-section dismissed"
+      >
+        <h5
+          style="cursor:pointer;"
+          @click="showDismissed = !showDismissed"
+        >
           <span class="icon">🗑️</span> Απορριφθέντα μηνύματα ({{ permanentlyDismissedMessages.length }})
           <span class="toggle-icon">{{ showDismissed ? '▼' : '▶' }}</span>
         </h5>
         <ul v-show="showDismissed">
-          <li v-for="msg in permanentlyDismissedMessages" :key="msg.id">
+          <li
+            v-for="msg in permanentlyDismissedMessages"
+            :key="msg.id"
+          >
             <p v-html="formatMessageText(msg.rawText)"></p>
             <div class="actions">
-              <button title="Επαναφορά μηνύματος" @click="restoreDismissed(msg.id)">Επαναφορά</button>
+              <button
+                title="Επαναφορά μηνύματος"
+                @click="restoreDismissed(msg.id)"
+              >
+                Επαναφορά
+              </button>
             </div>
           </li>
         </ul>
@@ -64,9 +101,21 @@ import { sendMessage } from 'webext-bridge/content-script';
 // Use the store as the single source of truth
 const messageStore = useMessageStore();
 
+// --- NEW: Filter Logic ---
+const filterQuery = ref('');
+const filteredMessages = computed(() => {
+  if (!filterQuery.value) {
+    return messageStore.visibleMessages;
+  }
+  const lowerCaseQuery = filterQuery.value.toLowerCase();
+  return messageStore.visibleMessages.filter(msg =>
+    msg.rawText.toLowerCase().includes(lowerCaseQuery)
+  );
+});
+// --- End of Filter Logic ---
+
 // **SIMPLIFIED**: These computed properties now directly use the store's computed properties.
 // No more complex local logic.
-const visibleMessages = computed(() => messageStore.visibleMessages);
 const permanentlyDismissedMessages = computed(() => messageStore.permanentlyDismissedMessages);
 
 const showDismissed = ref(false);
@@ -105,6 +154,17 @@ function formatMessageText(text: string): string {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+}
+.filter-wrapper {
+  margin-bottom: 10px;
+}
+.filter-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 0.9em;
 }
 .loading-messages, .no-app-id-message, .no-messages {
   color: #555;

@@ -1,5 +1,5 @@
 import { i18n } from "src/utils/i18n"
-import { pinia } from "src/utils/pinia"
+import { pinia } from  "src/background/state"
 import { appRouter } from "src/utils/router"
 import { createApp } from "vue"
 import App from "./app.vue"
