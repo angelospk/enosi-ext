@@ -22,7 +22,7 @@ graph TD
 
     subgraph "OPEKEPE Page (Content Context)"
         CS[Content Script]
-        Overlay[Injected UI Overlay (Vue)]
+        Overlay[Injected UI Overlay]
         DOM[DOM OPEKEPE]
     end
 
